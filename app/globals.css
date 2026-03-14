@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Relay brand palette - horizontal logo derived */
+    --relay-bg: #DFE8F1;
+    --relay-primary-dark: #1B2E3B;
+    --relay-secondary-dark: #213443;
+    --relay-deep-slate: #314555;
+    --relay-muted-steel: #3F5363;
+    --relay-soft-accent: #61707D;
+    /* Semantic mappings */
+    --background: #DFE8F1;
+    --foreground: #1B2E3B;
+    --card: #ffffff;
+    --card-foreground: #1B2E3B;
+    --popover: #ffffff;
+    --popover-foreground: #1B2E3B;
+    --primary: #213443;
+    --primary-foreground: #ffffff;
+    --secondary: #e8edf3;
+    --secondary-foreground: #1B2E3B;
+    --muted: #e8edf3;
+    --muted-foreground: #3F5363;
+    --accent: #c9d4de;
+    --accent-foreground: #1B2E3B;
+    --destructive: #7c3a2d;
+    --destructive-foreground: #ffffff;
+    --border: rgba(27, 46, 59, 0.12);
+    --input: rgba(27, 46, 59, 0.12);
+    --ring: #213443;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+}
+
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.2s ease-out;
+  }
+  .transition-smooth-slow {
+    transition: all 0.3s ease-out;
+  }
+}
+
+@keyframes relay-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-relay-fade-in {
+  animation: relay-fade-in 0.35s ease-out forwards;
+}

@@ -1,0 +1,102 @@
+-- Relay project schema (reference)
+-- Use this file for schema reference. Run against Neon Postgres when Phase 5+ is reached.
+
+-- Users (Phase 5+)
+-- CREATE TABLE users (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   email TEXT NOT NULL UNIQUE,
+--   name TEXT,
+--   google_refresh_token_encrypted TEXT,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Sessions
+-- CREATE TABLE sessions (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID REFERENCES users(id),
+--   started_at TIMESTAMPTZ DEFAULT NOW(),
+--   briefing_snapshot JSONB,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Pending actions
+-- CREATE TABLE pending_actions (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   session_id UUID REFERENCES sessions(id),
+--   type TEXT CHECK (type IN ('draft_email', 'create_event', 'follow_up')),
+--   payload JSONB,
+--   status TEXT CHECK (status IN ('pending', 'approved', 'rejected')),
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Action executions (audit/trust layer)
+-- CREATE TABLE action_executions (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   pending_action_id UUID REFERENCES pending_actions(id),
+--   user_id UUID REFERENCES users(id),
+--   proposed_action_payload JSONB,
+--   edited_payload JSONB,
+--   approved_at TIMESTAMPTZ,
+--   executed_at TIMESTAMPTZ,
+--   execution_status TEXT CHECK (execution_status IN ('success', 'failed')),
+--   error_message TEXT,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Meeting attendances
+-- CREATE TABLE meeting_attendances (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   session_id UUID REFERENCES sessions(id),
+--   event_id TEXT,
+--   transcript_snapshot TEXT,
+--   relay_update_text TEXT,
+--   voice_audio_url TEXT,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Briefings
+-- CREATE TABLE briefings (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   session_id UUID REFERENCES sessions(id),
+--   inbox_summary JSONB,
+--   calendar_summary JSONB,
+--   priorities JSONB,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- User profiles (Phase 4.5+)
+-- CREATE TABLE user_profiles (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID REFERENCES users(id) UNIQUE,
+--   display_name TEXT,
+--   role TEXT,
+--   timezone TEXT,
+--   communication_style TEXT,
+--   preferred_tone TEXT,
+--   audience_tones JSONB,
+--   autonomy_mode TEXT,
+--   auto_approve_rules JSONB,
+--   protected_actions JSONB,
+--   work_hours JSONB,
+--   focus_windows JSONB,
+--   meeting_update_style TEXT,
+--   voice_enabled BOOLEAN,
+--   voice_provider TEXT,
+--   voice_id TEXT,
+--   voice_consent_status TEXT,
+--   style_memory JSONB,
+--   onboarding_completed_at TIMESTAMPTZ,
+--   created_at TIMESTAMPTZ DEFAULT NOW(),
+--   updated_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Style learnings
+-- CREATE TABLE style_learnings (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID REFERENCES users(id),
+--   original_text TEXT,
+--   edited_text TEXT,
+--   context TEXT,
+--   extracted_preference JSONB,
+--   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
