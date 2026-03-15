@@ -111,8 +111,11 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
     },
   ]
 
+  const botIdentity =
+    session?.user?.name ? `${session.user.name}'s Relay` : BOT_LABEL
+
   return {
-    botIdentity: BOT_LABEL,
+    botIdentity,
     overallState: deriveOverallState(checkpoints),
     assumptions: [
       "Relay is Google-first for Gmail, Calendar, and future Meet detection.",

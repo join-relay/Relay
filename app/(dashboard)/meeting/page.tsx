@@ -5,7 +5,6 @@ import { AlertCircle, Calendar, Radio } from "lucide-react"
 import { IntegrationCheckpointCard } from "@/components/meeting/IntegrationCheckpointCard"
 import { JoinValidationPanel } from "@/components/meeting/JoinValidationPanel"
 import { MeetingPageHeader } from "@/components/meeting/MeetingPageHeader"
-import { BOT_LABEL } from "@/lib/constants"
 import type {
   MeetingLinkCheckAttempt,
   MeetingReadinessStatus,
@@ -112,6 +111,7 @@ export default function MeetingPage() {
         <MeetingPageHeader
           preparedCount={preparedCount}
           validatedCount={validatedCount}
+          botLabel={status.botIdentity}
         />
       </div>
 
@@ -124,7 +124,7 @@ export default function MeetingPage() {
                   Google meeting readiness
                 </h2>
                 <p className="mt-2 text-sm text-[#3F5363]">
-                  Relay is preparing the honest Google Meet path for {BOT_LABEL}.
+                  Relay is preparing the honest Google Meet path for {status.botIdentity}.
                   Live Google auth and Calendar discovery appear separately from
                   explicit fallback states.
                 </p>

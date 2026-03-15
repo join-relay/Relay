@@ -6,12 +6,24 @@ import { google } from "googleapis"
 import type { GoogleIntegrationStatus } from "@/types"
 import { decryptSecret, encryptSecret, isEncryptionConfigured } from "@/lib/security/encryption"
 
+export const GOOGLE_GMAIL_READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
+export const GOOGLE_GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.send"
+export const GOOGLE_CALENDAR_READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
+export const GOOGLE_CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events"
+export const GOOGLE_DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+
+const LEGACY_GOOGLE_CALENDAR_READ_SCOPE =
+  "https://www.googleapis.com/auth/calendar.events.readonly"
+
 export const GOOGLE_BASE_SCOPES = [
   "openid",
   "email",
   "profile",
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/calendar.events.readonly",
+  GOOGLE_GMAIL_READ_SCOPE,
+  GOOGLE_GMAIL_SEND_SCOPE,
+  GOOGLE_CALENDAR_READ_SCOPE,
+  GOOGLE_CALENDAR_WRITE_SCOPE,
+  GOOGLE_DRIVE_FILE_SCOPE,
 ] as const
 
 type GoogleTokenRecord = {
@@ -60,6 +72,15 @@ async function writePersistentStore(records: Record<string, GoogleTokenRecord>) 
   await writeFile(STORE_FILE, JSON.stringify(records, null, 2), "utf8")
 }
 
+/** Persist a single updated record (e.g. after refresh) so file and in-memory stay in sync. */
+async function persistRecordToFile(record: GoogleTokenRecord) {
+  const key = getRecordKey(record.email, record.subject)
+  if (!key) return
+  const fileRecords = await readPersistentStore()
+  fileRecords[key] = record
+  await writePersistentStore(fileRecords)
+}
+
 function normalizeEmail(email?: string | null) {
   return email?.trim().toLowerCase()
 }
@@ -69,6 +90,17 @@ function normalizeScopes(scopeValue?: string | null) {
     ?.split(/\s+/)
     .map((scope) => scope.trim())
     .filter(Boolean) ?? []
+}
+
+function hasGrantedScope(scopes: string[], requiredScope: string) {
+  return scopes.includes(requiredScope)
+}
+
+function hasLegacyCalendarReadScope(scopes: string[]) {
+  return (
+    hasGrantedScope(scopes, LEGACY_GOOGLE_CALENDAR_READ_SCOPE) &&
+    !hasGrantedScope(scopes, GOOGLE_CALENDAR_READ_SCOPE)
+  )
 }
 
 function getRecordKey(email?: string | null, subject?: string | null) {
@@ -132,6 +164,7 @@ async function refreshAccessToken(record: GoogleTokenRecord) {
   }
   record.updatedAt = new Date().toISOString()
 
+  await persistRecordToFile(record)
   return record.accessToken
 }
 
@@ -233,7 +266,7 @@ export async function getGoogleAccessToken(email?: string | null) {
     return record.accessToken
   }
 
-  return refreshAccessToken(record)
+  return await refreshAccessToken(record)
 }
 
 export async function getBaseGoogleIntegrationStatus(params: {
@@ -245,10 +278,9 @@ export async function getBaseGoogleIntegrationStatus(params: {
   const encryptionReady = isEncryptionConfigured()
   const record = await getGoogleAccountRecord(params.email)
   const scopes = record?.scopes ?? []
-  const canReadGmail = scopes.includes("https://www.googleapis.com/auth/gmail.readonly")
-  const canReadCalendar = scopes.includes(
-    "https://www.googleapis.com/auth/calendar.events.readonly"
-  )
+  const canReadGmail = hasGrantedScope(scopes, GOOGLE_GMAIL_READ_SCOPE)
+  const canReadCalendar = hasGrantedScope(scopes, GOOGLE_CALENDAR_READ_SCOPE)
+  const hasStaleCalendarReadScope = hasLegacyCalendarReadScope(scopes)
 
   if (!env.ready) {
     return {
@@ -322,6 +354,32 @@ export async function getBaseGoogleIntegrationStatus(params: {
     note:
       canReadGmail && canReadCalendar
         ? "Google auth is connected and Relay can attempt live Gmail and Calendar reads."
-        : "Google auth is connected, but the required read scopes are still missing for live briefing data.",
+        : hasStaleCalendarReadScope
+          ? "Google auth is connected, but Relay now needs the broader Google Calendar readonly scope for the live multi-calendar read path. Disconnect and reconnect Google in Settings to re-consent."
+          : "Google auth is connected, but the required read scopes are still missing for live briefing data.",
   }
+}
+
+export function applyCalendarReadFailureToStatus(
+  status: GoogleIntegrationStatus,
+  error: unknown
+) {
+  const message =
+    error instanceof Error && error.message
+      ? error.message
+      : "Google auth is connected, but live Calendar read failed."
+  const reconnectRequired =
+    message.toLowerCase().includes("re-author") ||
+    message.toLowerCase().includes("reconsent") ||
+    message.toLowerCase().includes("reconnect")
+
+  status.status = reconnectRequired ? "blocked" : "fallback"
+  status.canReadCalendar = false
+  status.canUseLiveBriefing = false
+  status.nextMeetEvent = null
+  status.note = reconnectRequired
+    ? message
+    : `Google auth is connected, but live Calendar read failed: ${message}`
+
+  return status
 }

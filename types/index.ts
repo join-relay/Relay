@@ -92,6 +92,20 @@ export interface ActionsViewState {
   statusNote: string
 }
 
+/** Persisted record of an action execution (audit/trust layer). */
+export interface ActionExecutionRecord {
+  id: string
+  actionId: string
+  type: ActionType
+  title: string
+  proposedPayload: DraftEmailPayload | RescheduleMeetingPayload
+  executedAt: string
+  status: "success" | "failed"
+  errorMessage?: string
+  userEmail?: string | null
+  source: "live" | "mock"
+}
+
 export type IntegrationState =
   | "not_configured"
   | "blocked"

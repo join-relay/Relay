@@ -26,8 +26,10 @@ export async function POST(
     }
 
     console.error("Actions approve error:", error)
+    const message =
+      error instanceof Error ? error.message : "Failed to approve action"
     return NextResponse.json(
-      { error: "Failed to approve action" },
+      { error: message },
       { status: 500 }
     )
   }

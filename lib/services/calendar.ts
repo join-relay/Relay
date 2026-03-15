@@ -2,7 +2,11 @@ import "server-only"
 
 import { google } from "googleapis"
 import type { CalendarEvent } from "@/types"
-import { getGoogleAccessToken, getGoogleOAuthClient } from "@/lib/services/google-auth"
+import {
+  clearGoogleAccountConnection,
+  getGoogleAccessToken,
+  getGoogleOAuthClient,
+} from "@/lib/services/google-auth"
 
 function getDateWindow() {
   const start = new Date()
@@ -88,56 +92,122 @@ function sortEvents(left: CalendarEvent, right: CalendarEvent) {
   return new Date(left.start).getTime() - new Date(right.start).getTime()
 }
 
+function isInsufficientScopesError(err: unknown): boolean {
+  if (err instanceof Error) {
+    const msg = err.message.toLowerCase()
+    if (msg.includes("insufficient authentication scopes")) return true
+    if (msg.includes("insufficient authentication")) return true
+  }
+  const status = (err as { code?: number; status?: number })?.code ?? (err as { code?: number; status?: number })?.status
+  if (status === 403) {
+    const msg = String((err as Error)?.message ?? "").toLowerCase()
+    if (msg.includes("scope") || msg.includes("insufficient")) return true
+  }
+  return false
+}
+
 export async function getLiveCalendarEvents(email?: string | null, limit = 25): Promise<CalendarEvent[]> {
   const accessToken = await getGoogleAccessToken(email)
   if (!accessToken) {
     throw new Error("No Google access token is available for Calendar")
   }
 
+  try {
+    const calendar = google.calendar({
+      version: "v3",
+      auth: getGoogleOAuthClient(accessToken),
+    })
+    const { timeMin, timeMax } = getDateWindow()
+    const calendarListResponse = await calendar.calendarList.list({
+      maxResults: 20,
+    })
+    const calendars = (calendarListResponse.data.items ?? []).filter(isIncludedCalendar)
+    const targetCalendars = calendars.length > 0
+      ? calendars
+      : [{ id: "primary", summary: "Primary calendar", primary: true, selected: true }]
+
+    const eventGroups = await Promise.all(
+      targetCalendars.map(async (calendarEntry) => {
+        const response = await calendar.events.list({
+          calendarId: calendarEntry.id ?? "primary",
+          timeMin,
+          timeMax,
+          singleEvents: true,
+          orderBy: "startTime",
+          maxResults: limit,
+        })
+
+        return (response.data.items ?? []).map((event) => {
+          const joinUrl = getGoogleMeetLink(event)
+
+          return {
+            id: `${calendarEntry.id ?? "primary"}:${event.id ?? crypto.randomUUID()}`,
+            title: event.summary ?? "(Untitled event)",
+            start: getEventDate(event.start),
+            end: getEventDate(event.end),
+            location: event.location ?? (joinUrl ? "Google Meet" : undefined),
+            calendarName: calendarEntry.summary ?? (calendarEntry.primary ? "Primary calendar" : undefined),
+            isAllDay: Boolean(event.start?.date && !event.start?.dateTime),
+            provider: "google",
+            meetingProvider: joinUrl?.includes("meet.google.com") ? "google_meet" : undefined,
+            joinUrl,
+            externalEventId: event.iCalUID ?? event.id ?? undefined,
+            isMeeting: Boolean(joinUrl),
+          } satisfies CalendarEvent
+        })
+      })
+    )
+
+    return eventGroups.flat().sort(sortEvents).slice(0, limit)
+  } catch (err) {
+    if (isInsufficientScopesError(err) && email) {
+      await clearGoogleAccountConnection(email)
+      throw new Error(
+        "Calendar access requires re-authorization. Please disconnect and reconnect Google in Settings to grant the updated Calendar readonly scope."
+      )
+    }
+    throw err
+  }
+}
+
+/** Parse our composite event id into calendarId and eventId for the API. */
+function parseEventId(compositeId: string): { calendarId: string; eventId: string } {
+  const colon = compositeId.indexOf(":")
+  if (colon >= 0) {
+    return {
+      calendarId: compositeId.slice(0, colon) || "primary",
+      eventId: compositeId.slice(colon + 1) || compositeId,
+    }
+  }
+  return { calendarId: "primary", eventId: compositeId }
+}
+
+/** Reschedule a calendar event. Requires calendar.events scope. */
+export async function patchCalendarEvent(
+  email: string | null | undefined,
+  eventId: string,
+  proposedStart: string,
+  proposedEnd: string
+): Promise<{ id: string }> {
+  const accessToken = await getGoogleAccessToken(email)
+  if (!accessToken) {
+    throw new Error("No Google access token is available for Calendar patch")
+  }
+
+  const { calendarId, eventId: apiEventId } = parseEventId(eventId)
   const calendar = google.calendar({
     version: "v3",
     auth: getGoogleOAuthClient(accessToken),
   })
-  const { timeMin, timeMax } = getDateWindow()
-  const calendarListResponse = await calendar.calendarList.list({
-    maxResults: 20,
+
+  const res = await calendar.events.patch({
+    calendarId,
+    eventId: apiEventId,
+    requestBody: {
+      start: { dateTime: proposedStart, timeZone: "UTC" },
+      end: { dateTime: proposedEnd, timeZone: "UTC" },
+    },
   })
-  const calendars = (calendarListResponse.data.items ?? []).filter(isIncludedCalendar)
-  const targetCalendars = calendars.length > 0
-    ? calendars
-    : [{ id: "primary", summary: "Primary calendar", primary: true, selected: true }]
 
-  const eventGroups = await Promise.all(
-    targetCalendars.map(async (calendarEntry) => {
-      const response = await calendar.events.list({
-        calendarId: calendarEntry.id ?? "primary",
-        timeMin,
-        timeMax,
-        singleEvents: true,
-        orderBy: "startTime",
-        maxResults: limit,
-      })
-
-      return (response.data.items ?? []).map((event) => {
-        const joinUrl = getGoogleMeetLink(event)
-
-        return {
-          id: `${calendarEntry.id ?? "primary"}:${event.id ?? crypto.randomUUID()}`,
-          title: event.summary ?? "(Untitled event)",
-          start: getEventDate(event.start),
-          end: getEventDate(event.end),
-          location: event.location ?? (joinUrl ? "Google Meet" : undefined),
-          calendarName: calendarEntry.summary ?? (calendarEntry.primary ? "Primary calendar" : undefined),
-          isAllDay: Boolean(event.start?.date && !event.start?.dateTime),
-          provider: "google",
-          meetingProvider: joinUrl?.includes("meet.google.com") ? "google_meet" : undefined,
-          joinUrl,
-          externalEventId: event.iCalUID ?? event.id ?? undefined,
-          isMeeting: Boolean(joinUrl),
-        } satisfies CalendarEvent
-      })
-    })
-  )
-
-  return eventGroups.flat().sort(sortEvents).slice(0, limit)
+  return { id: res.data.id ?? apiEventId }
 }

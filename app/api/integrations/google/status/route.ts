@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server"
 import { getOptionalSession } from "@/auth"
 import { getUpcomingGoogleMeet, getLiveCalendarEvents } from "@/lib/services/calendar"
-import { getBaseGoogleIntegrationStatus } from "@/lib/services/google-auth"
+import {
+  applyCalendarReadFailureToStatus,
+  getBaseGoogleIntegrationStatus,
+} from "@/lib/services/google-auth"
 
 export const dynamic = "force-dynamic"
 
@@ -19,10 +22,7 @@ export async function GET() {
         const events = await getLiveCalendarEvents(session.user.email)
         status.nextMeetEvent = getUpcomingGoogleMeet(events)
       } catch (error) {
-        status.note =
-          error instanceof Error
-            ? `Google auth is connected, but live Calendar read failed: ${error.message}`
-            : "Google auth is connected, but live Calendar read failed."
+        applyCalendarReadFailureToStatus(status, error)
       }
     }
 

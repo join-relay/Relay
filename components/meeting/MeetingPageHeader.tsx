@@ -5,11 +5,13 @@ import { Radio, ShieldCheck } from "lucide-react"
 interface MeetingPageHeaderProps {
   preparedCount: number
   validatedCount: number
+  botLabel: string
 }
 
 export function MeetingPageHeader({
   preparedCount,
   validatedCount,
+  botLabel,
 }: MeetingPageHeaderProps) {
   return (
     <div className="relative overflow-hidden rounded-relay-card border border-[var(--border)] bg-white shadow-relay-elevated">
@@ -24,7 +26,7 @@ export function MeetingPageHeader({
               Relay is now Google-first for upcoming Meet detection and honest fallback states.
             </p>
             <p className="mt-3 max-w-2xl text-sm text-[#314555]">
-              Relay will only report validated milestones for Yassin&apos;s Relay.
+              Relay will only report validated milestones for {botLabel}.
               This page shows what is live from Google auth and Calendar today,
               and what still remains intentionally unimplemented.
             </p>

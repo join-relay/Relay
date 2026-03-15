@@ -6,6 +6,7 @@ import {
 } from "@/auth"
 import { getUpcomingGoogleMeet, getLiveCalendarEvents } from "@/lib/services/calendar"
 import {
+  applyCalendarReadFailureToStatus,
   clearGoogleAccountConnection,
   getBaseGoogleIntegrationStatus,
 } from "@/lib/services/google-auth"
@@ -27,10 +28,7 @@ export default async function SettingsPage() {
       const events = await getLiveCalendarEvents(sessionEmail)
       status.nextMeetEvent = getUpcomingGoogleMeet(events)
     } catch (error) {
-      status.note =
-        error instanceof Error
-          ? `Google auth is connected, but live Calendar read failed: ${error.message}`
-          : "Google auth is connected, but live Calendar read failed."
+      applyCalendarReadFailureToStatus(status, error)
     }
   }
 

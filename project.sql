@@ -29,18 +29,32 @@
 --   created_at TIMESTAMPTZ DEFAULT NOW()
 -- );
 
--- Action executions (audit/trust layer)
+-- Action executions (audit/trust layer). G2: provider, external IDs, failure detail.
 -- CREATE TABLE action_executions (
 --   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --   pending_action_id UUID REFERENCES pending_actions(id),
 --   user_id UUID REFERENCES users(id),
---   proposed_action_payload JSONB,
---   edited_payload JSONB,
---   approved_at TIMESTAMPTZ,
---   executed_at TIMESTAMPTZ,
+--   action_id TEXT NOT NULL,
+--   type TEXT NOT NULL,
+--   title TEXT,
+--   proposed_payload JSONB NOT NULL,
+--   executed_at TIMESTAMPTZ NOT NULL,
 --   execution_status TEXT CHECK (execution_status IN ('success', 'failed')),
 --   error_message TEXT,
+--   user_email TEXT,
+--   source TEXT CHECK (source IN ('live', 'mock')),
 --   created_at TIMESTAMPTZ DEFAULT NOW()
+-- );
+
+-- Selected Drive files (G2). Picker-selected file IDs per user; file-based store used until DB.
+-- CREATE TABLE selected_drive_files (
+--   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+--   user_id UUID REFERENCES users(id),
+--   file_id TEXT NOT NULL,
+--   name TEXT,
+--   mime_type TEXT,
+--   web_view_link TEXT,
+--   last_synced_at TIMESTAMPTZ DEFAULT NOW()
 -- );
 
 -- Meeting attendances
