@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Dashboard from "@/components/Dashboard";
 import WellbeingCheckIn from "@/components/WellbeingCheckIn";
 import ProfileOverview from "@/components/ProfileOverview";
+import RelayTestPanel from "@/components/RelayTestPanel";
 import { getDemoContext } from "@/lib/demo-context";
 import type { WorkLifeContext } from "@/types/context";
 
@@ -98,13 +99,21 @@ export default function DashboardPage() {
         </h1>
         <div className="flex items-center gap-2 text-[10px] sm:text-xs">
           {!isDemo && (
-            <button
-              onClick={refresh}
-              disabled={context === "loading"}
-              className="px-2 py-1 rounded-lg border border-[var(--pixel-shadow)] bg-[var(--pixel-panel)] text-[var(--pixel-text)] hover:bg-[var(--pixel-highlight)]/20 disabled:opacity-50 transition-colors"
-            >
-              Refresh
-            </button>
+            <>
+              <button
+                onClick={refresh}
+                disabled={context === "loading"}
+                className="px-2 py-1 rounded-lg border border-[var(--pixel-shadow)] bg-[var(--pixel-panel)] text-[var(--pixel-text)] hover:bg-[var(--pixel-highlight)]/20 disabled:opacity-50 transition-colors"
+              >
+                Refresh
+              </button>
+              <Link
+                href="/onboarding"
+                className="px-2 py-1 rounded-lg border border-[var(--pixel-shadow)] bg-[var(--pixel-panel)] text-[var(--pixel-text)] hover:bg-[var(--pixel-highlight)]/20"
+              >
+                Profile
+              </Link>
+            </>
           )}
           <Link
             href="/"
@@ -136,6 +145,7 @@ export default function DashboardPage() {
           <WellbeingCheckIn onSubmitted={refresh} />
         )}
         <Dashboard context={context} provider={provider} onSync={refresh} isDemo={isDemo} />
+        {!isDemo && <RelayTestPanel />}
       </main>
     </div>
   );
