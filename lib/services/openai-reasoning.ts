@@ -136,6 +136,21 @@ function extractOutputText(body: unknown): string {
     if (parts.length > 0) return parts.join("\n")
   }
 
+  // Responses API: output[].message.content[].text (nested message wrapper)
+  if (Array.isArray(output)) {
+    for (const item of output) {
+      const msg = (item as Record<string, unknown>).message ?? item
+      const content = (msg as Record<string, unknown>).content
+      if (!Array.isArray(content)) continue
+      const parts: string[] = []
+      for (const block of content) {
+        const c = block as Record<string, unknown>
+        if (typeof c.text === "string" && c.text.trim()) parts.push(c.text.trim())
+      }
+      if (parts.length > 0) return parts.join("\n")
+    }
+  }
+
   // Chat Completions-style fallback
   const choices = obj.choices
   if (Array.isArray(choices) && choices.length > 0) {
@@ -153,7 +168,44 @@ function extractOutputText(body: unknown): string {
     }
   }
 
+  // Deep fallback: find any substantial string under key "text" or "body" in the response
+  const found = deepFindTextOrBody(body)
+  if (found) return found
+
   return ""
+}
+
+/** Walk object and return first non-empty string from a "text" or "body" key (min length to avoid noise). */
+function deepFindTextOrBody(value: unknown, minLen = 40): string | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === "string") {
+    const t = value.trim()
+    return t.length >= minLen ? t : null
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const v = deepFindTextOrBody(item, minLen)
+      if (v) return v
+    }
+    return null
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>
+    if (typeof obj.text === "string") {
+      const t = obj.text.trim()
+      if (t.length >= minLen) return t
+    }
+    if (typeof obj.body === "string") {
+      const t = obj.body.trim()
+      if (t.length >= minLen) return t
+    }
+    for (const k of Object.keys(obj)) {
+      if (k === "error" || k === "usage" || k === "id" || k === "object" || k === "created_at") continue
+      const v = deepFindTextOrBody(obj[k], minLen)
+      if (v) return v
+    }
+  }
+  return null
 }
 
 async function requestJson<T>(
@@ -396,7 +448,7 @@ export async function generateDraftEmailBody(params: {
         }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "OpenAI draft email generation failed"
-    console.warn("OpenAI draft email generation failed:", error)
+    console.error("[OpenAI] draft email generation failed:", errorMessage, error)
     return {
       body: null,
       model: getReasoningModel("default"),
