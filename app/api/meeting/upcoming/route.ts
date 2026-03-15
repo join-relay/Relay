@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
-import { getUpcomingTeamsMeetingStatus } from "@/lib/services/teams-proof-of-life"
+import { getUpcomingMeetingStatus } from "@/lib/services/meeting-readiness"
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
-  return NextResponse.json(getUpcomingTeamsMeetingStatus())
+  return NextResponse.json(await getUpcomingMeetingStatus())
 }

@@ -104,6 +104,8 @@ export default function ActionsPage() {
           pendingCount={pendingActions.length}
           urgentCount={urgentCount}
           conflictCount={conflictCount}
+          sourceLabel="Demo Actions"
+          statusNote="These suggested replies and reschedules are still seeded examples in this pass. They are reviewable, but not pulled from your live Gmail yet."
         />
       </div>
       <div className="space-y-4 animate-relay-fade-in opacity-0 [animation-delay:75ms] [animation-fill-mode:forwards]">

@@ -1,10 +1,9 @@
-# Relay build rules
+## Temporary rule: Google-first implementation
 
-- Build for hackathon judging: innovation, impact, usability, technical execution, implementation, presentation.
-- Prioritize one flagship flow over breadth.
-- Make Relay feel like a real connected product, not a chatbot wrapper.
-- Gmail + Calendar context is core.
-- Meeting presence must be disclosed as "Yassin's Relay".
-- Outbound actions must be reviewable before sending.
-- Optimize for demo clarity and polish.
-- Cut aggressively if a feature does not improve the live demo.
+- The current source of truth is the Google-first revised plan.
+- Microsoft Teams is out of scope.
+- Google OAuth is the required auth path for Gmail, Calendar, Drive, and Meet-related data.
+- Never imply Relay joined or spoke in a meeting without real proof.
+- Preserve the polished Briefing and Actions UI.
+- Keep the Meeting route, but repurpose it to Google Meet readiness and honest fallback states.
+- Build only the approved next pass unless explicitly told otherwise.

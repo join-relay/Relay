@@ -1,13 +1,15 @@
 import { NextResponse } from "next/server"
-import { getTeamsProofOfLifeStatus } from "@/lib/services/teams-proof-of-life"
+import { getMeetingReadinessStatus } from "@/lib/services/meeting-readiness"
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    return NextResponse.json(getTeamsProofOfLifeStatus())
+    return NextResponse.json(await getMeetingReadinessStatus())
   } catch (error) {
     console.error("Meeting status API error:", error)
     return NextResponse.json(
-      { error: "Failed to load Teams proof-of-life status" },
+      { error: "Failed to load Google meeting readiness status" },
       { status: 500 }
     )
   }

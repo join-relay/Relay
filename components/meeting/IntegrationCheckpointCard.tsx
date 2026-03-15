@@ -2,21 +2,21 @@
 
 import { AlertCircle, CheckCircle2, Clock3, ShieldOff } from "lucide-react"
 import { cn } from "@/lib/utils"
-import type { ProofOfLifeState, TeamsProofCheckpoint } from "@/types"
+import type { IntegrationState, MeetingIntegrationCheckpoint } from "@/types"
 
-const badgeStyles: Record<ProofOfLifeState, string> = {
+const badgeStyles: Record<IntegrationState, string> = {
   not_configured: "border-[#7c3a2d]/20 bg-[#7c3a2d]/5 text-[#7c3a2d]",
   blocked: "border-[#7c3a2d]/20 bg-[#7c3a2d]/5 text-[#7c3a2d]",
-  pending_external_validation:
+  fallback:
     "border-[#3F5363]/20 bg-[#e8edf3]/65 text-[#314555]",
   validated: "border-[#1B2E3B]/20 bg-[#1B2E3B]/5 text-[#1B2E3B]",
 }
 
-function StatusIcon({ state }: { state: ProofOfLifeState }) {
+function StatusIcon({ state }: { state: IntegrationState }) {
   if (state === "validated") {
     return <CheckCircle2 className="h-4 w-4" />
   }
-  if (state === "pending_external_validation") {
+  if (state === "fallback") {
     return <Clock3 className="h-4 w-4" />
   }
   if (state === "not_configured") {
@@ -26,7 +26,7 @@ function StatusIcon({ state }: { state: ProofOfLifeState }) {
 }
 
 interface IntegrationCheckpointCardProps {
-  checkpoint: TeamsProofCheckpoint
+  checkpoint: MeetingIntegrationCheckpoint
 }
 
 export function IntegrationCheckpointCard({

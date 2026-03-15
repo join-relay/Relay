@@ -6,12 +6,16 @@ interface ActionsPageHeaderProps {
   pendingCount: number
   urgentCount: number
   conflictCount?: number
+  sourceLabel?: string
+  statusNote?: string
 }
 
 export function ActionsPageHeader({
   pendingCount,
   urgentCount,
   conflictCount = 0,
+  sourceLabel = "Demo Actions",
+  statusNote = "Actions stay review-only and mock-backed in this pass. Real Gmail send and Calendar changes come later.",
 }: ActionsPageHeaderProps) {
   const hasUrgency = urgentCount > 0 || conflictCount > 0
   const summaryLine =
@@ -31,6 +35,11 @@ export function ActionsPageHeader({
               Pending actions
             </h1>
             <p className="mt-0.5 text-sm text-[#3F5363]">{summaryLine}</p>
+            <div className="mt-2">
+              <span className="rounded-relay-control border border-[var(--border)] bg-white px-2 py-1 text-[11px] font-medium text-[#314555]">
+                {sourceLabel}
+              </span>
+            </div>
             {hasUrgency && (
               <p className="mt-1.5 text-sm text-[#314555]">
                 {urgentCount > 0 && `${urgentCount} urgent`}
@@ -39,7 +48,7 @@ export function ActionsPageHeader({
               </p>
             )}
             <p className="mt-3 text-xs text-[#61707D] max-w-lg">
-              Relay never executes without your review in Demo Mode.
+              {statusNote}
             </p>
           </div>
           <div className="flex gap-6 shrink-0">

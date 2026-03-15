@@ -6,6 +6,7 @@ import { ArrowRight, Mail, Calendar } from "lucide-react"
 interface BriefingCardProps {
   displayName: string
   date: string
+  source?: "google" | "mock"
   stats: {
     urgentEmails: number
     totalEmails: number
@@ -13,7 +14,7 @@ interface BriefingCardProps {
   }
 }
 
-export function BriefingCard({ displayName, date, stats }: BriefingCardProps) {
+export function BriefingCard({ displayName, date, source = "mock", stats }: BriefingCardProps) {
   const hasUrgency = stats.urgentEmails > 0 || stats.conflicts > 0
   const summarySentence = hasUrgency
     ? `${stats.urgentEmails} urgent item${stats.urgentEmails !== 1 ? "s" : ""} and ${stats.conflicts} conflict${stats.conflicts !== 1 ? "s" : ""} need your attention.`
@@ -29,6 +30,11 @@ export function BriefingCard({ displayName, date, stats }: BriefingCardProps) {
               Good morning, {displayName}
             </h1>
             <p className="mt-0.5 text-sm text-[#3F5363]">{date}</p>
+            <div className="mt-2">
+              <span className="rounded-relay-control border border-[var(--border)] bg-white px-2 py-1 text-[11px] font-medium text-[#314555]">
+                {source === "google" ? "Google Live" : "Mock Fallback"}
+              </span>
+            </div>
             <p className="mt-3 text-sm text-[#314555] max-w-lg">
               {summarySentence}
             </p>

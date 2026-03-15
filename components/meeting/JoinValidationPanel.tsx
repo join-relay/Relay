@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import type { TeamsJoinAttempt } from "@/types"
+import type { MeetingLinkCheckAttempt } from "@/types"
 
 interface JoinValidationPanelProps {
-  lastJoinAttempt?: TeamsJoinAttempt
+  lastJoinAttempt?: MeetingLinkCheckAttempt
   isSubmitting?: boolean
   errorMessage?: string
   onSubmit: (targetMeeting: string) => void
@@ -21,12 +21,12 @@ export function JoinValidationPanel({
   return (
     <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
       <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-        Join validation
+        Meet link readiness
       </h2>
       <p className="mt-2 text-sm text-[#3F5363]">
-        Use one real Microsoft Teams meeting URL to prepare the proof-of-life
-        join path. This does not claim a successful join until external
-        validation is observed.
+        Paste one real Google Meet URL to confirm Relay recognizes it as an
+        in-scope meeting link. This does not claim Relay joined, spoke, or
+        retrieved anything from the meeting.
       </p>
 
       <form
@@ -40,7 +40,7 @@ export function JoinValidationPanel({
           type="url"
           value={targetMeeting}
           onChange={(event) => setTargetMeeting(event.target.value)}
-          placeholder="https://teams.microsoft.com/l/meetup-join/..."
+          placeholder="https://meet.google.com/..."
           className="w-full rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20"
         />
         <button
@@ -48,7 +48,7 @@ export function JoinValidationPanel({
           disabled={isSubmitting}
           className="inline-flex items-center gap-2 rounded-relay-control bg-[#213443] px-4 py-2 text-sm font-medium text-white shadow-relay-soft transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSubmitting ? "Preparing..." : "Prepare join validation"}
+          {isSubmitting ? "Checking..." : "Check Meet link"}
         </button>
       </form>
 

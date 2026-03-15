@@ -21,6 +21,8 @@ export function getMockBriefing(): Briefing {
       month: "long",
       day: "numeric",
     }),
+    source: "mock",
+    statusNote: "Relay is showing seeded fallback data until Google auth is connected.",
     inboxSummary: {
       total: seededThreads.length,
       urgent: seededThreads.filter((t) => t.isUnread).length,

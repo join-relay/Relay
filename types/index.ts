@@ -14,13 +14,14 @@ export interface CalendarEvent {
   start: string
   end: string
   location?: string
+  calendarName?: string
   isAllDay?: boolean
   isConflict?: boolean
   provider?: "demo" | "google"
-  meetingProvider?: "teams" | "zoom" | "google_meet"
+  meetingProvider?: "google_meet" | "zoom" | "other"
   joinUrl?: string
   externalEventId?: string
-  isTeamsMeeting?: boolean
+  isMeeting?: boolean
 }
 
 export interface PriorityItem {
@@ -36,6 +37,8 @@ export interface PriorityItem {
 export interface Briefing {
   displayName: string
   date: string
+  source?: "google" | "mock"
+  statusNote?: string
   inboxSummary: {
     total: number
     urgent: number
@@ -84,54 +87,68 @@ export interface PendingAction {
   createdAt: string
 }
 
-export type ProofOfLifeState =
+export interface ActionsViewState {
+  source: "mock" | "google"
+  statusNote: string
+}
+
+export type IntegrationState =
   | "not_configured"
   | "blocked"
-  | "pending_external_validation"
+  | "fallback"
   | "validated"
 
-export interface TeamsProofCheckpoint {
+export interface MeetingIntegrationCheckpoint {
   key:
-    | "configured"
-    | "webhookReachable"
-    | "tenantInstallValidated"
-    | "realJoinPathValidated"
+    | "googleAuth"
+    | "gmailBriefing"
+    | "calendarRead"
+    | "meetDiscovery"
+    | "liveJoinPath"
   label: string
-  state: ProofOfLifeState
-  source: "derived" | "runtime" | "manual"
+  state: IntegrationState
+  source: "derived" | "google" | "demo" | "runtime"
   detail: string
   blocker?: string
 }
 
-export interface TeamsWebhookEvent {
-  id: string
-  receivedAt: string
-  eventType: string
-  source: "manual_probe" | "external_callback"
-  note: string
-}
-
-export interface TeamsJoinAttempt {
+export interface MeetingLinkCheckAttempt {
   id: string
   createdAt: string
   targetMeeting: string
-  state: "blocked" | "awaiting_external_validation" | "validated"
+  state: "blocked" | "fallback" | "validated"
   detail: string
 }
 
-export interface TeamsUpcomingMeetingStatus {
-  state: "blocked"
+export interface MeetingUpcomingStatus {
+  state: "blocked" | "fallback" | "validated"
   detail: string
+  upcomingMeeting?: CalendarEvent | null
 }
 
-export interface TeamsProofOfLifeStatus {
+export interface MeetingReadinessStatus {
   botIdentity: string
-  overallState: ProofOfLifeState
-  webhookUrl?: string
+  overallState: IntegrationState
   assumptions: string[]
   manualSteps: string[]
   runtimeEvidenceNote: string
-  checkpoints: TeamsProofCheckpoint[]
-  lastWebhookEvent?: TeamsWebhookEvent
-  lastJoinAttempt?: TeamsJoinAttempt
+  checkpoints: MeetingIntegrationCheckpoint[]
+  nextMeeting?: CalendarEvent | null
+  lastLinkCheck?: MeetingLinkCheckAttempt
+}
+
+export interface GoogleIntegrationStatus {
+  status: IntegrationState
+  displayName?: string
+  email?: string
+  scopes: string[]
+  missingEnv: string[]
+  hasSession: boolean
+  hasRefreshToken: boolean
+  encryptionReady: boolean
+  canReadGmail: boolean
+  canReadCalendar: boolean
+  canUseLiveBriefing: boolean
+  nextMeetEvent?: CalendarEvent | null
+  note: string
 }

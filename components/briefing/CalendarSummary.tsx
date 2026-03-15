@@ -73,6 +73,7 @@ export function CalendarSummary({
             <p className="text-xs text-[#3F5363] mt-0.5">
               {formatTime(event.start)} – {formatTime(event.end)}
               {event.location && ` · ${event.location}`}
+              {event.calendarName && ` · ${event.calendarName}`}
             </p>
           </div>
         ))}
