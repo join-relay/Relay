@@ -1,18 +1,12 @@
-# Dependencies
-node_modules/
+node_modules
+.next
+.env*.local
+*.db
+data/
 
-# Env (never commit keys)
-.env
-.env.local
-.env.*.local
-
-# Build / IDE
-.next/
+# From main (merged)
 out/
 dist/
-*.tsbuildinfo
 .vercel/
-
-# OS
 .DS_Store
 Thumbs.db

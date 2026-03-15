@@ -1,0 +1,14 @@
+---
+description: Update CHAT_CONTEXT.md when chat context usage reaches ~75%
+alwaysApply: true
+---
+
+# Update chat context at 75%
+
+When **chat context usage reaches about 75%**, update `CHAT_CONTEXT.md` before continuing:
+
+1. Add a short **session summary** under "## Changes and fixes (session summary)" with what was done in this chat (features, fixes, paths).
+2. Adjust **Project structure** and **What this project is** if new files or behavior were added.
+3. Keep the **Habit** line at the top so future sessions know to do the same.
+
+This keeps context usable for the next turn or a new chat without losing important decisions and paths.
