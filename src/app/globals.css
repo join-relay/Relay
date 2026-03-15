@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme: warm neutral + teal accent (readable, calm, professional) */
+:root {
+  --pixel-bg: #f1f5f9;
+  --pixel-panel: #ffffff;
+  --pixel-panel-dark: #0f172a;
+  --pixel-border: #334155;
+  --pixel-text: #0f172a;
+  --pixel-text-light: #64748b;
+  --pixel-highlight: #0d9488;
+  --pixel-face: #fef3c7;
+  --pixel-hp: #059669;
+  --pixel-hp-bg: #e2e8f0;
+  --pixel-stress: #b91c1c;
+  --pixel-shadow: #cbd5e1;
+}
+
+body {
+  @apply antialiased;
+  background-color: var(--pixel-bg);
+  color: var(--pixel-text);
+  font-family: var(--font-pixel), ui-sans-serif, system-ui, sans-serif;
+}
