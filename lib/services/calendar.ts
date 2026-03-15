@@ -196,13 +196,16 @@ export async function getCalendarEventById(
       auth: getGoogleOAuthClient(accessToken),
     })
     const { calendarId, eventId } = parseEventId(compositeEventId)
-    const res = await calendar.events.get({
-      calendarId,
-      eventId,
-    })
+    // conferenceDataVersion is supported by Calendar API but not in googleapis type defs
+    // @ts-expect-error - valid request parameter
+    const res = await calendar.events.get({ calendarId, eventId, conferenceDataVersion: 1 }) as { data: Parameters<typeof getGoogleMeetLink>[0] & { conferenceData?: { conferenceId?: string }; attendees?: Array<{ email?: string; displayName?: string; responseStatus?: string }>; summary?: string; description?: string; start?: { dateTime?: string; date?: string }; end?: { dateTime?: string; date?: string }; location?: string; iCalUID?: string; id?: string } }
     const event = res.data
     const joinUrl = getGoogleMeetLink(event)
-    const attendees: CalendarEventAttendee[] = (event.attendees ?? []).map((a) => ({
+    const conferenceId =
+      typeof (event as { conferenceData?: { conferenceId?: string } }).conferenceData?.conferenceId === "string"
+        ? (event as { conferenceData: { conferenceId: string } }).conferenceData.conferenceId
+        : undefined
+    const attendees: CalendarEventAttendee[] = (event.attendees ?? []).map((a: { email?: string; displayName?: string; responseStatus?: string }) => ({
       email: a.email ?? undefined,
       displayName: a.displayName ?? undefined,
       responseStatus: (a.responseStatus as CalendarEventAttendee["responseStatus"]) ?? undefined,
@@ -221,6 +224,7 @@ export async function getCalendarEventById(
       isMeeting: Boolean(joinUrl),
       description: event.description ?? undefined,
       attendees: attendees.length > 0 ? attendees : undefined,
+      conferenceId,
     }
   } catch {
     return null

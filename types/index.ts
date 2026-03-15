@@ -32,6 +32,8 @@ export interface CalendarEvent {
   description?: string
   /** Attendees (from Calendar API when fetching single event). */
   attendees?: CalendarEventAttendee[]
+  /** Meet conference ID for Meet REST API (from Calendar when conferenceDataVersion=1). */
+  conferenceId?: string
 }
 
 export interface PriorityItem {

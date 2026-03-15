@@ -11,6 +11,8 @@ export const GOOGLE_GMAIL_SEND_SCOPE = "https://www.googleapis.com/auth/gmail.se
 export const GOOGLE_CALENDAR_READ_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 export const GOOGLE_CALENDAR_WRITE_SCOPE = "https://www.googleapis.com/auth/calendar.events"
 export const GOOGLE_DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file"
+/** Read meeting space data (e.g. post-meeting transcripts) from Google Meet REST API. */
+export const GOOGLE_MEET_READ_SCOPE = "https://www.googleapis.com/auth/meetings.space.readonly"
 
 const LEGACY_GOOGLE_CALENDAR_READ_SCOPE =
   "https://www.googleapis.com/auth/calendar.events.readonly"
@@ -24,6 +26,7 @@ export const GOOGLE_BASE_SCOPES = [
   GOOGLE_CALENDAR_READ_SCOPE,
   GOOGLE_CALENDAR_WRITE_SCOPE,
   GOOGLE_DRIVE_FILE_SCOPE,
+  GOOGLE_MEET_READ_SCOPE,
 ] as const
 
 type GoogleTokenRecord = {
