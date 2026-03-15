@@ -165,6 +165,8 @@ export interface GoogleIntegrationStatus {
   canUseLiveBriefing: boolean
   nextMeetEvent?: CalendarEvent | null
   note: string
+}
+
 /**
  * Relay — Digital Double
  * Shared types for the you-model and agent engine.

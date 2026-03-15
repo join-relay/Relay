@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -c package.json)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"require\\(''./package-lock.json''\\)\")"
+    ]
+  }
+}
