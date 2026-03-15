@@ -99,6 +99,12 @@ export default async function LoginPage() {
                 Sessions persist through Auth.js, so once you are signed in you should return
                 directly to the app until you explicitly log out.
               </div>
+
+              <p className="mt-6 text-center text-xs text-[#3F5363]">
+                <a href="/privacy" className="underline hover:text-[#1B2E3B]">Privacy Policy</a>
+                {" · "}
+                <a href="/terms" className="underline hover:text-[#1B2E3B]">Terms of Service</a>
+              </p>
             </div>
           </section>
         </div>

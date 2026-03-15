@@ -88,28 +88,72 @@ function clipErrorText(raw: string, maxLength = 240) {
   return `${normalized.slice(0, maxLength).trimEnd()}...`
 }
 
-function extractOutputText(body: unknown) {
+function extractOutputText(body: unknown): string {
   if (!body || typeof body !== "object") return ""
-  const typed = body as {
-    output_text?: unknown
-    output?: Array<{
-      content?: Array<{
-        text?: unknown
-      }>
-    }>
+  const obj = body as Record<string, unknown>
+
+  // Top-level output_text (some docs)
+  if (typeof obj.output_text === "string" && obj.output_text.trim()) {
+    return obj.output_text
   }
 
-  if (typeof typed.output_text === "string") {
-    return typed.output_text
+  // Responses API: output = array of messages with content[].text
+  const output = obj.output
+  if (Array.isArray(output)) {
+    const parts: string[] = []
+    for (const item of output) {
+      const msg = item as Record<string, unknown>
+      const content = msg.content
+      if (!Array.isArray(content)) continue
+      for (const block of content) {
+        const c = block as Record<string, unknown>
+        if (typeof c.text === "string" && c.text.trim()) {
+          parts.push(c.text.trim())
+        }
+      }
+    }
+    if (parts.length > 0) return parts.join("\n")
   }
 
-  const content = typed.output
-    ?.flatMap((item) => item.content ?? [])
-    .map((item) => (typeof item.text === "string" ? item.text : ""))
-    .filter(Boolean)
-    .join("\n")
+  // Alternate: output_items (some API versions)
+  const outputItems = obj.output_items ?? obj.output_items_done
+  if (Array.isArray(outputItems)) {
+    const parts: string[] = []
+    for (const item of outputItems) {
+      const it = item as Record<string, unknown>
+      const content = it.content ?? it.text
+      if (typeof content === "string" && content.trim()) {
+        parts.push(content.trim())
+      }
+      if (Array.isArray(it.content)) {
+        for (const block of it.content as Array<Record<string, unknown>>) {
+          if (typeof block?.text === "string" && String(block.text).trim()) {
+            parts.push(String(block.text).trim())
+          }
+        }
+      }
+    }
+    if (parts.length > 0) return parts.join("\n")
+  }
 
-  return content ?? ""
+  // Chat Completions-style fallback
+  const choices = obj.choices
+  if (Array.isArray(choices) && choices.length > 0) {
+    const first = choices[0] as Record<string, unknown>
+    const msg = first.message ?? first
+    const message = msg as Record<string, unknown>
+    const content = message.content
+    if (typeof content === "string") return content
+    if (Array.isArray(content)) {
+      const text = content
+        .map((c) => (typeof c === "object" && c && "text" in c ? (c as { text?: string }).text : null))
+        .filter(Boolean)
+        .join("\n")
+      if (text) return text
+    }
+  }
+
+  return ""
 }
 
 async function requestJson<T>(
@@ -153,6 +197,7 @@ async function requestJson<T>(
       body && typeof body === "object" && "error" in body
         ? String((body as { error?: { message?: string } }).error?.message ?? "OpenAI request failed")
         : "OpenAI request failed"
+    console.error("[OpenAI] request failed:", response.status, message)
     options?.debug?.onResponse?.({
       ok: response.ok,
       status: response.status,
@@ -168,6 +213,8 @@ async function requestJson<T>(
     outputText: text,
   })
   if (!text) {
+    const keys = body && typeof body === "object" ? Object.keys(body as object).join(", ") : "no body"
+    console.error("[OpenAI] no text output in response; top-level keys:", keys)
     throw new Error("OpenAI returned no text output")
   }
 
@@ -175,6 +222,7 @@ async function requestJson<T>(
     return parseJsonResponse<T>(text)
   } catch (error) {
     const message = error instanceof Error ? error.message : "OpenAI returned invalid JSON output"
+    console.error("[OpenAI] parse error:", message, clipErrorText(text))
     throw new Error(`${message}: ${clipErrorText(text)}`)
   }
 }
@@ -220,6 +268,7 @@ async function requestText(
       body && typeof body === "object" && "error" in body
         ? String((body as { error?: { message?: string } }).error?.message ?? "OpenAI request failed")
         : "OpenAI request failed"
+    console.error("[OpenAI] request failed:", response.status, message)
     options?.debug?.onResponse?.({
       ok: response.ok,
       status: response.status,
@@ -235,6 +284,8 @@ async function requestText(
     outputText: text,
   })
   if (!text) {
+    const keys = body && typeof body === "object" ? Object.keys(body as object).join(", ") : "no body"
+    console.error("[OpenAI] no text output in response (requestText); top-level keys:", keys)
     throw new Error("OpenAI returned no text output")
   }
 
@@ -403,7 +454,7 @@ export async function enhanceBriefingPriorities(params: {
 
     return enhanced.length > 0 ? enhanced : null
   } catch (error) {
-    console.warn("OpenAI briefing prioritization failed:", error)
+    console.error("[OpenAI] briefing prioritization failed:", error)
     return null
   }
 }

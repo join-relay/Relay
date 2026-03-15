@@ -227,3 +227,5 @@ The app uses file-based storage (`.relay/*.json`) by default. On Vercel the file
 4. Redeploy. The app will use KV for Google tokens, meeting runs, user preferences, drafts, and other stores. Action approval state still uses the filesystem locally; on Vercel it may not persist until that store is migrated to the backend.
 
 **Google sign-in "redirect_uri_mismatch" on Vercel:** Add your app’s callback URL to the OAuth client in Google Cloud Console. See [docs/GOOGLE_OAUTH_VERCEL.md](docs/GOOGLE_OAUTH_VERCEL.md) for the exact URI and steps.
+
+**AI / OpenAI not responding on Vercel:** Set `OPENAI_API_KEY` in the project's Environment Variables and redeploy. To debug failures, use **Runtime Logs**: Vercel Dashboard → project → **Logs**. See [docs/VERCEL_LOGS.md](docs/VERCEL_LOGS.md).

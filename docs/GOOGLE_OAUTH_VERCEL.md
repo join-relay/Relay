@@ -23,6 +23,17 @@ NEXTAUTH_URL=https://relay-phi-green.vercel.app
 
 NextAuth builds the redirect URI as `{NEXTAUTH_URL}/api/auth/callback/google`, so that value must match what you added in the Google Console.
 
+## OAuth consent screen (Testing app)
+
+If you configure the app as a **Testing** app, Google may ask for:
+
+- **Application privacy policy link**  
+  Use: `https://relay-phi-green.vercel.app/privacy`
+- **Application terms of service link**  
+  Use: `https://relay-phi-green.vercel.app/terms`
+
+These routes are public and do not require sign-in.
+
 ## Local dev
 
 For local sign-in, also add:
