@@ -94,6 +94,24 @@ async function checkMeetReadiness(targetMeeting: string) {
   return body as MeetingLinkCheckAttempt
 }
 
+async function createRecallBot(meetingUrl: string) {
+  const response = await fetch("/api/meeting/providers/recall/bot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ meetingUrl, botName: "Relay" }),
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(
+      (body as { error?: string }).error ?? `Create bot failed (${response.status})`
+    )
+  }
+  if (!(body as { success?: boolean }).success) {
+    throw new Error((body as { error?: string }).error ?? "Recall did not confirm bot creation")
+  }
+  return body
+}
+
 export default function MeetingPage() {
   const queryClient = useQueryClient()
   const {
@@ -112,6 +130,13 @@ export default function MeetingPage() {
 
   const joinMutation = useMutation({
     mutationFn: checkMeetReadiness,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })
+    },
+  })
+
+  const createBotMutation = useMutation({
+    mutationFn: createRecallBot,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })
     },
@@ -213,6 +238,142 @@ export default function MeetingPage() {
               ))}
             </div>
           </div>
+
+          {status.providerReadiness && (
+            <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+                    Recall.ai provider foundation
+                  </h2>
+                  <p className="mt-2 text-sm text-[#3F5363]">
+                    {status.providerReadiness.note}
+                  </p>
+                </div>
+                <span className="rounded-relay-control border border-[var(--border)] bg-[#e8edf3] px-2 py-1 text-xs font-medium uppercase text-[#314555]">
+                  {status.providerReadiness.configState}
+                </span>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                    Provider
+                  </p>
+                  <p className="mt-1 text-sm text-[#1B2E3B]">
+                    {status.providerReadiness.configState === "configured"
+                      ? "Configured"
+                      : "Not configured"}
+                  </p>
+                </div>
+                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                    Bot creation scaffold
+                  </p>
+                  <p className="mt-1 text-sm text-[#1B2E3B]">
+                    {status.providerReadiness.botCreationScaffoldingState === "ready"
+                      ? "Ready"
+                      : "Not ready"}
+                  </p>
+                </div>
+                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                    Live bot status
+                  </p>
+                  <p className="mt-1 text-sm text-[#1B2E3B] capitalize">
+                    {status.providerReadiness.liveBotState.replaceAll("_", " ")}
+                  </p>
+                </div>
+              </div>
+
+              {status.providerReadiness.configState === "configured" && (
+                <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                    Create Recall bot
+                  </p>
+                  <p className="mt-1 text-sm text-[#3F5363]">
+                    Paste a Google Meet URL and create a real Recall bot. Status and transcript appear only when the provider confirms.
+                  </p>
+                  <form
+                    className="mt-3 flex gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      const form = e.currentTarget
+                      const input = form.querySelector<HTMLInputElement>('input[name="recall-meet-url"]')
+                      const url = input?.value?.trim()
+                      if (url) createBotMutation.mutate(url)
+                    }}
+                  >
+                    <input
+                      name="recall-meet-url"
+                      type="url"
+                      placeholder="https://meet.google.com/..."
+                      className="min-w-0 flex-1 rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20"
+                    />
+                    <button
+                      type="submit"
+                      disabled={createBotMutation.isPending}
+                      className="shrink-0 rounded-relay-control bg-[#213443] px-4 py-2 text-sm font-medium text-white shadow-relay-soft transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {createBotMutation.isPending ? "Creating…" : "Create bot"}
+                    </button>
+                  </form>
+                  {createBotMutation.isError && (
+                    <p className="mt-2 text-sm text-[#7c3a2d]">
+                      {createBotMutation.error instanceof Error
+                        ? createBotMutation.error.message
+                        : "Create bot failed"}
+                    </p>
+                  )}
+                  {createBotMutation.isSuccess && (
+                    <p className="mt-2 text-sm text-[#1B2E3B]">
+                      Bot created. Status will update as the provider reports join and transcript events.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {status.activeRecallRun && (
+                <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
+                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                    Current run (provider-confirmed)
+                  </p>
+                  <p className="mt-1 text-sm text-[#1B2E3B]">
+                    Run ID: {status.activeRecallRun.id}
+                    {status.activeRecallRun.botId && ` · Bot ID: ${status.activeRecallRun.botId}`}
+                  </p>
+                  <p className="mt-1 text-sm text-[#3F5363]">
+                    Status: {status.activeRecallRun.status}
+                    {status.activeRecallRun.providerStatus && ` · Provider: ${status.activeRecallRun.providerStatus}`}
+                  </p>
+                  {status.activeRecallRun.artifactMetadata && (
+                    <p className="mt-1 text-sm text-[#3F5363]">
+                      Transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s) received.
+                    </p>
+                  )}
+                  {status.activeRecallRun.providerError && (
+                    <p className="mt-1 text-sm text-[#7c3a2d]">
+                      Provider error: {status.activeRecallRun.providerError}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]">
+                API base: {status.providerReadiness.apiBaseUrl}
+              </div>
+
+              {status.providerReadiness.missingEnv.length > 0 && (
+                <div className="mt-3 rounded-relay-inner border border-[#7c3a2d]/20 bg-[#7c3a2d]/5 p-3 text-sm text-[#7c3a2d]">
+                  Missing server env: {status.providerReadiness.missingEnv.join(", ")}
+                </div>
+              )}
+
+              <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]">
+                Webhook secret: {status.providerReadiness.webhookConfigured ? "configured" : "not configured"}
+              </div>
+            </div>
+          )}
 
           <JoinValidationPanel
             lastJoinAttempt={lastJoinAttempt}

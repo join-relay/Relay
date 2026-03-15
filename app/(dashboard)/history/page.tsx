@@ -1,7 +1,8 @@
-import { Ban, Calendar, CheckCircle2, Mail, XCircle } from "lucide-react"
+import { Ban, Calendar, CheckCircle2, Mail, Radio, XCircle } from "lucide-react"
 import { listActionExecutions } from "@/lib/persistence/action-executions"
 import { listMeetingHistoryEntries } from "@/lib/persistence/meeting-history"
-import type { ActionExecutionRecord, MeetingHistoryEntry } from "@/types"
+import { listMeetingRuns } from "@/lib/persistence/meeting-runs"
+import type { ActionExecutionRecord, MeetingHistoryEntry, MeetingRunRecord } from "@/types"
 
 export const dynamic = "force-dynamic"
 
@@ -104,6 +105,59 @@ function renderExecutionDetails(record: ActionExecutionRecord) {
   return null
 }
 
+function MeetingRunCard({ run }: { run: MeetingRunRecord }) {
+  const transcriptCount = run.artifactMetadata?.transcriptEntries ?? run.transcriptEntries?.length ?? 0
+  return (
+    <li className="rounded-relay-card border border-[var(--border)] bg-white/80 p-4 shadow-relay-soft">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-relay-control bg-[#e8edf3] text-[#314555]">
+            <Radio className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="font-medium text-[#1B2E3B]">Recall bot run</p>
+            <p className="text-sm text-[#3F5363]">{run.meetingUrl}</p>
+            <p className="mt-1 text-xs text-[#61707D]">
+              {formatRecordedAt(run.createdAt)} · updated {formatRecordedAt(run.updatedAt)}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <span className="rounded-relay-control bg-[#e8edf3] px-2 py-1 text-[11px] font-medium text-[#314555]">
+            {run.status}
+          </span>
+          {run.providerStatus && (
+            <span className="rounded-relay-control border border-[var(--border)] bg-white/70 px-2 py-1 text-[11px] font-medium text-[#3F5363]">
+              {run.providerStatus.replaceAll(".", " ")}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+        <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">Bot ID</p>
+          <p className="mt-1 truncate font-mono text-xs text-[#314555]">{run.botId ?? "—"}</p>
+        </div>
+        <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">Transcript</p>
+          <p className="mt-1 text-sm text-[#314555]">
+            {transcriptCount > 0 ? `${transcriptCount} utterance(s)` : "No transcript yet"}
+          </p>
+        </div>
+        <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+          <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">Run ID</p>
+          <p className="mt-1 truncate font-mono text-xs text-[#314555]">{run.id}</p>
+        </div>
+      </div>
+      {run.providerError && (
+        <p className="mt-2 rounded-relay-inner border border-[#7c3a2d]/20 bg-[#7c3a2d]/5 px-3 py-2 text-sm text-[#7c3a2d]">
+          {run.providerError}
+        </p>
+      )}
+    </li>
+  )
+}
+
 function MeetingHistoryCard({ entry }: { entry: MeetingHistoryEntry }) {
   return (
     <li className="rounded-relay-card border border-[var(--border)] bg-white/80 p-4 shadow-relay-soft">
@@ -195,9 +249,10 @@ function DetailRow({
 }
 
 export default async function HistoryPage() {
-  const [executions, meetingEntries] = await Promise.all([
+  const [executions, meetingEntries, meetingRuns] = await Promise.all([
     listActionExecutions(),
     listMeetingHistoryEntries(),
+    listMeetingRuns(),
   ])
 
   return (
@@ -314,23 +369,40 @@ export default async function HistoryPage() {
         <div>
           <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">Meeting history</h2>
           <p className="mt-1 text-sm text-[#3F5363]">
-            Future Google Meet runs will land here with summary, transcript, and metadata fields.
+            Recall meeting runs and manual/placeholder meeting records with transcript availability.
           </p>
         </div>
-        {meetingEntries.length === 0 ? (
+        {meetingRuns.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#61707D]">
+              Recall meeting runs
+            </h3>
+            <ul className="space-y-3">
+              {meetingRuns.map((run) => (
+                <MeetingRunCard key={run.id} run={run} />
+              ))}
+            </ul>
+          </div>
+        )}
+        {meetingEntries.length === 0 && meetingRuns.length === 0 ? (
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-8 text-center shadow-relay-soft">
             <p className="text-[#3F5363]">No meeting history yet.</p>
             <p className="mt-1 text-sm text-[#314555]">
-              When Relay has a real meeting run or manual fallback artifact, this section will show the summary, transcript preview, and meeting metadata.
+              Create a Recall bot on the Meeting page to see runs here. Manual meeting entries will appear when available.
             </p>
           </div>
-        ) : (
-          <ul className="space-y-3">
-            {meetingEntries.map((entry) => (
-              <MeetingHistoryCard key={entry.id} entry={entry} />
-            ))}
-          </ul>
-        )}
+        ) : meetingEntries.length > 0 ? (
+          <div className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#61707D]">
+              Meeting entries
+            </h3>
+            <ul className="space-y-3">
+              {meetingEntries.map((entry) => (
+                <MeetingHistoryCard key={entry.id} entry={entry} />
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </section>
     </div>
   )
