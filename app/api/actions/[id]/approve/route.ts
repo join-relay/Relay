@@ -20,7 +20,8 @@ export async function POST(
     if (
       error instanceof Error &&
       (error.message === "Action already approved" ||
-        error.message === "Cannot approve rejected action")
+        error.message === "Cannot approve rejected action" ||
+        error.message === "Generate a reply before approving this email action")
     ) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }

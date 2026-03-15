@@ -14,7 +14,11 @@ export async function POST(
 
     return NextResponse.json(updated)
   } catch (error) {
-    if (error instanceof Error && error.message === "Cannot reject approved action") {
+    if (
+      error instanceof Error &&
+      (error.message === "Cannot reject approved action" ||
+        error.message === "Action already rejected")
+    ) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
 

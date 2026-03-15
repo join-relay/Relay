@@ -1,11 +1,40 @@
 export interface GmailThread {
   id: string
+  messageId?: string
   subject: string
   snippet: string
   from: string
   date: string
   isUnread?: boolean
   labels?: string[]
+}
+
+export interface GmailThreadMessage {
+  id: string
+  from: string
+  to?: string
+  date: string
+  snippet: string
+  bodyPreview?: string
+  bodyText?: string
+  rfcMessageId?: string
+  referenceMessageIds?: string[]
+}
+
+export interface GmailThreadContext {
+  threadId: string
+  subject: string
+  preview: string
+  participants: string[]
+  replyToMessageId?: string
+  referenceMessageIds: string[]
+  messages: GmailThreadMessage[]
+}
+
+export interface SentEmailSample {
+  subject: string
+  snippet: string
+  bodyText: string
 }
 
 export interface CalendarEvent {
@@ -55,12 +84,34 @@ export interface Briefing {
 
 export type ActionType = "draft_email" | "reschedule_meeting"
 export type ActionStatus = "pending" | "approved" | "rejected"
+export type ActionExecutionStatus = "success" | "failed" | "rejected"
+export type ActionOrigin = "live" | "mock"
+export type ActionProvider = "gmail" | "google_calendar" | "mock"
+export type ActionSourceType = "gmail_thread" | "calendar_event" | "demo_fallback"
+export type GreetingStyle = "formal" | "warm" | "casual" | "minimal" | "none"
+export type TonePreference = "warm" | "professional" | "direct" | "friendly"
+export type FormalityPreference = "formal" | "balanced" | "casual"
+export type ConcisenessPreference = "brief" | "balanced" | "detailed"
+export type SentenceLengthPreference = "short" | "medium" | "long"
+export type SignOffStyle = "best" | "best_regards" | "thanks" | "regards" | "name_only" | "none"
+export type MeetingUpdateStyle = "crisp_status" | "warm_summary" | "action_focused"
+export type DirectnessPreference = "low" | "balanced" | "high"
+export type DraftGenerationSource = "openai" | "deterministic_fallback"
+export type DraftFinalSource =
+  | "openai_fresh_generation"
+  | "cached_generated_draft"
+  | "deterministic_fallback"
+export type PunctuationStyle = "light" | "standard" | "expressive"
+export type CapitalizationStyle = "sentence_case" | "mostly_lowercase" | "mixed"
+export type SignatureUsage = "consistent" | "occasional" | "none"
 
 export interface DraftEmailPayload {
   to?: string
   subject: string
   body: string
   threadId?: string
+  replyToMessageId?: string
+  referenceMessageIds?: string[]
 }
 
 export interface RescheduleMeetingPayload {
@@ -72,15 +123,151 @@ export interface RescheduleMeetingPayload {
   proposedEnd: string
 }
 
+export interface EmailStyleProfile {
+  profileVersion: number
+  source: "sent_mail" | "fallback"
+  analyzedAt: string
+  sampleCount: number
+  sampledEmailSubjects: string[]
+  greetingStyle: GreetingStyle
+  tone: TonePreference
+  formality: FormalityPreference
+  sentenceLength: SentenceLengthPreference
+  averageSentenceLengthWords: number
+  directness: DirectnessPreference
+  punctuationStyle: PunctuationStyle
+  capitalizationStyle: CapitalizationStyle
+  usesEmDash: boolean
+  usesBullets: boolean
+  signOffStyle: SignOffStyle
+  signatureUsage: SignatureUsage
+  signatureBlock?: string
+  commonPhrases: string[]
+  structuralHabits: string[]
+  formattingHabits: string[]
+  styleAnchors: {
+    greetingExamples: string[]
+    openingLineExamples: string[]
+    closingLineExamples: string[]
+    signOffExamples: string[]
+    signatureExamples: string[]
+    formattingPatterns: string[]
+  }
+}
+
+export interface DraftGenerationMetadata {
+  source: DraftGenerationSource
+  finalDraftSource: DraftFinalSource
+  cacheStatus?: "generated" | "cached" | "regenerated"
+  generatedAt: string
+  model?: string
+  openAIConfigured: boolean
+  attemptedOpenAI: boolean
+  usedOriginalThreadContext: boolean
+  usedSentMailStyle: boolean
+  usedSavedSettings: boolean
+  styleSampleCount: number
+  fallbackReason?: string
+  note: string
+  debug?: {
+    actionId: string
+    threadId: string
+    latestMessageId?: string
+    activeThreadText: string
+    cacheKey: string
+    cacheVersion: number
+    cachedDraftSource?: DraftGenerationSource
+    usedCachedDraft: boolean
+    openAISucceeded: boolean
+    openAIError?: string
+    openAIDraftPreview?: string
+    groundingAccepted?: boolean
+    fallbackTriggered: boolean
+    fallbackReason?: string
+    finalDraftSource: DraftFinalSource
+  }
+}
+
+export interface RelayCustomizationSettings {
+  emailTone: TonePreference
+  emailFormality: FormalityPreference
+  emailConciseness: ConcisenessPreference
+  useSignature: boolean
+  emailSignatureOverride?: string
+  includeGreeting: boolean
+  includeSignOff: boolean
+  enableBrowserNotifications: boolean
+  enableNotificationSound: boolean
+  meetingTone: TonePreference
+  meetingFormality: FormalityPreference
+  meetingConciseness: ConcisenessPreference
+  meetingUpdateStyle: MeetingUpdateStyle
+}
+
+export interface ActionPersonalization {
+  styleSource: EmailStyleProfile["source"] | "settings_only"
+  settingsApplied: boolean
+  summary: string
+  styleDebug?: {
+    sampleCount: number
+    usesEmDash: boolean
+    usesBullets: boolean
+    signatureUsage: SignatureUsage
+    greetingStyle: GreetingStyle
+    signOffStyle: SignOffStyle
+  }
+  generation?: DraftGenerationMetadata
+}
+
+export interface EmailActionOriginalContext {
+  kind: "gmail_thread"
+  preview: string
+  thread: GmailThreadContext
+}
+
+export interface CalendarActionOriginalContext {
+  kind: "calendar_event"
+  preview: string
+  title: string
+  currentStart: string
+  currentEnd: string
+  location?: string
+  joinUrl?: string
+}
+
+export type ActionOriginalContext =
+  | EmailActionOriginalContext
+  | CalendarActionOriginalContext
+
+export interface ActionSourceIdentifiers {
+  gmailThreadId?: string
+  gmailMessageId?: string
+  gmailRfcMessageId?: string
+  gmailReferenceMessageIds?: string[]
+  calendarEventId?: string
+  calendarId?: string
+  demoActionId?: string
+}
+
+export interface ActionProvenance {
+  provider: ActionProvider
+  sourceType: ActionSourceType
+  origin: ActionOrigin
+  sourceIdentifiers?: ActionSourceIdentifiers
+}
+
 export interface PendingAction {
   id: string
   type: ActionType
   title: string
   sourceContext: string
+  provenance: ActionProvenance
   proposedAction: DraftEmailPayload | RescheduleMeetingPayload
   status: ActionStatus
   urgency: "urgent" | "important" | "low"
   whySurfaced: string
+  originalContext?: ActionOriginalContext
+  personalization?: ActionPersonalization
   reviewedContent?: DraftEmailPayload | RescheduleMeetingPayload
   executedAt?: string
   executionSummary?: string
@@ -98,12 +285,17 @@ export interface ActionExecutionRecord {
   actionId: string
   type: ActionType
   title: string
+  sourceContext: string
   proposedPayload: DraftEmailPayload | RescheduleMeetingPayload
+  executionSummary?: string
   executedAt: string
-  status: "success" | "failed"
+  status: ActionExecutionStatus
   errorMessage?: string
   userEmail?: string | null
-  source: "live" | "mock"
+  source: ActionOrigin
+  provider: ActionProvider
+  sourceType: ActionSourceType
+  sourceIdentifiers?: ActionSourceIdentifiers
 }
 
 export type IntegrationState =
@@ -142,6 +334,7 @@ export interface MeetingUpcomingStatus {
 
 export interface MeetingReadinessStatus {
   botIdentity: string
+  resolutionState: "live" | "fallback" | "empty" | "error"
   overallState: IntegrationState
   assumptions: string[]
   manualSteps: string[]
@@ -149,6 +342,20 @@ export interface MeetingReadinessStatus {
   checkpoints: MeetingIntegrationCheckpoint[]
   nextMeeting?: CalendarEvent | null
   lastLinkCheck?: MeetingLinkCheckAttempt
+  customizationSummary?: string
+  summarySurface: {
+    state: "empty" | "pending" | "available"
+    summary: string | null
+  }
+  actionItemsSurface: {
+    state: "empty" | "pending" | "available"
+    items: string[]
+  }
+  transcriptSurface: {
+    state: "empty" | "pending" | "available"
+    previewLines: string[]
+    note: string
+  }
 }
 
 export interface GoogleIntegrationStatus {
@@ -165,4 +372,21 @@ export interface GoogleIntegrationStatus {
   canUseLiveBriefing: boolean
   nextMeetEvent?: CalendarEvent | null
   note: string
+}
+
+export interface MeetingHistoryEntry {
+  id: string
+  title: string
+  occurredAt: string
+  provider: "google_meet"
+  source: "rest_artifact" | "manual_fallback" | "placeholder"
+  summary: string | null
+  actionItems: string[]
+  transcriptPreview: string[]
+  transcriptState: "unavailable" | "pending" | "available"
+  metadata: {
+    participantsLabel: string
+    artifactLabel: string
+    durationLabel?: string
+  }
 }
