@@ -4,3 +4,25 @@ node_modules
 .env.local
 .relay
 *.log
+# Dependencies
+node_modules/
+
+# Env (never commit keys)
+.env
+.env.local
+.env.*.local
+
+# Build / IDE
+.next/
+out/
+dist/
+*.tsbuildinfo
+.vercel/
+
+# Data (wellbeing app)
+*.db
+data/
+
+# OS
+.DS_Store
+Thumbs.db

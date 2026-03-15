@@ -1,58 +1,56 @@
 # Relay
-Relay is a disclosed AI chief-of-staff and stunt double for overload moments.
 
-## Current Focus
-Relay is currently on the Google-first path:
-- Gmail-backed Briefing and Actions
-- Google Calendar-backed scheduling and meeting readiness
-- OpenAI-assisted email drafting with deterministic fallback when needed
+Relay is a disclosed AI chief-of-staff and overload copilot with a Google-first product path.
 
-Microsoft Teams is out of scope in the current implementation pass.
+## Current Product State
 
-## What Changed Most Recently
-The latest work focused on making the live Gmail reply flow real, inspectable, and safer:
-- live Google-backed actions and briefing routes now load from Gmail and Calendar instead of demo-only data when auth is available
-- action state, generated drafts, execution history, user preferences, and dev test state are persisted under `.relay/`
-- Gmail reply generation now tracks draft source explicitly: fresh OpenAI, cached OpenAI, cached fallback, or fresh deterministic fallback
-- draft generation includes tighter cache binding to the active thread and debug metadata for diagnosis
-- a dev-only draft diagnostics route exists at `/api/dev/draft-diagnostics` for tracing a specific live Gmail action
-- Playwright coverage was added for live-action flows and draft regressions
+- Gmail-backed Briefing and Actions are the current source of truth.
+- Google Calendar powers scheduling context and Meeting readiness discovery.
+- OpenAI-assisted reply drafting stays explicit about fresh, cached, and deterministic fallback paths.
+- Settings, History, login, and the polished dashboard shell remain the live product surfaces.
+- Microsoft Teams is out of scope for the current implementation pass.
 
-## Key Files
-- `lib/services/actions.ts`: main live Actions pipeline, draft generation, caching, and final source selection
-- `lib/services/gmail.ts`: Gmail thread fetch, active-thread extraction, reply metadata
-- `lib/services/openai-reasoning.ts`: OpenAI request handling for drafting and ranking
-- `lib/services/email-style.ts`: sent-mail style analysis and stored style profiles
-- `app/api/actions/route.ts`: Actions API
-- `app/api/actions/[id]/draft/route.ts`: on-demand draft generation
-- `app/api/dev/draft-diagnostics/route.ts`: dev-only live draft trace endpoint
-- `.relay/generated-drafts.json`: persisted generated draft cache
-- `.relay/email-style-profiles.json`: persisted sent-mail style analysis
-- `.relay/google-connections.json`: persisted Google OAuth connection state
+## Meeting Direction
 
-## Recent Email Drafting Notes
-The live Gmail draft path now records enough detail to distinguish:
-- `openai_fresh_generation`
-- `cached_generated_draft`
-- `deterministic_fallback`
+The current Meeting page is an honest readiness surface:
 
-Useful metadata lives on `action.personalization.generation`.
+- Google Meet discovery is live when Calendar auth and data are available.
+- Recall.ai now has minimal provider scaffolding and readiness reporting only.
+- Relay does not claim to join, speak in, or summarize a meeting without real provider evidence.
 
-If a live Gmail draft falls back, check:
-- `fallbackReason`
-- `debug.openAISucceeded`
-- `debug.openAIError`
-- `debug.groundingAccepted`
-- `debug.usedCachedDraft`
-- `debug.cachedDraftSource`
+## Useful Experimental Work Kept Isolated
 
-## Dev Workflow
-- `npm run dev`
+The repository also contains an isolated meeting-agent prototype:
+
+- `lib/agent.ts`
+- `lib/you-model.ts`
+- `lib/claude.ts`
+- `docs/CONNECTING.md`
+- `docs/INTEGRATION.md`
+
+These files are preserved for future meeting-bot work, but they do not replace the current Google-first app flows.
+
+## Key Runtime Areas
+
+- `app/(dashboard)/*`: live UI surfaces
+- `app/api/actions/*`: action generation and approval
+- `app/api/meeting/*`: meeting readiness and provider scaffolding
+- `lib/services/gmail.ts`: Gmail reads and reply context
+- `lib/services/actions.ts`: draft generation and action orchestration
+- `lib/services/meeting-readiness.ts`: honest meeting readiness state
+- `lib/services/recall.ts`: minimal Recall.ai provider foundation
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+Useful checks:
+
+- `npm run typecheck`
+- `npm run test`
 - `npm run test:e2e`
 
-The app uses `.env.local` for local secrets and runtime config.
-
-## What Still Needs Attention
-- broader end-to-end validation across more real signed-in Gmail threads
-- continued hardening of grounding and reply-quality checks without losing relevant OpenAI drafts
-- cleanup and packaging of the temporary dev diagnostics once the email pipeline is considered stable
+Local secrets live in `.env.local`. Use `.env.example` as the server-side config reference.
