@@ -1,11 +1,7 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type { ActionExecutionRecord } from "@/types"
-
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "action-executions.json")
+import { getStore, setStore } from "./store-backend"
 
 function normalizeActionExecutionRecord(raw: unknown): ActionExecutionRecord | null {
   if (!raw || typeof raw !== "object") return null
@@ -117,25 +113,20 @@ function normalizeActionExecutionRecord(raw: unknown): ActionExecutionRecord | n
 
 async function readAll(): Promise<ActionExecutionRecord[]> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const data = JSON.parse(raw)
+    const data = await getStore("action-executions")
     return Array.isArray(data)
       ? data
           .map(normalizeActionExecutionRecord)
           .filter((record): record is ActionExecutionRecord => record !== null)
       : []
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return []
     console.error("Failed to read action executions store:", error)
     return []
   }
 }
 
 async function writeAll(records: ActionExecutionRecord[]) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(records, null, 2), "utf8")
+  await setStore("action-executions", records)
 }
 
 export async function appendActionExecution(record: ActionExecutionRecord): Promise<void> {

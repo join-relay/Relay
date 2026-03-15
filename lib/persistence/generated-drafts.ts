@@ -1,11 +1,7 @@
 import "server-only"
 
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type { DraftGenerationMetadata } from "@/types"
-
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "generated-drafts.json")
+import { getStore, setStore } from "./store-backend"
 
 export interface GeneratedDraftRecord {
   actionId: string
@@ -44,8 +40,8 @@ function normalizeRecord(
 
 async function readStore(): Promise<DraftStore> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const parsed = JSON.parse(raw) as Record<string, Record<string, Partial<GeneratedDraftRecord>>>
+    const parsed = (await getStore("generated-drafts")) as Record<string, Record<string, Partial<GeneratedDraftRecord>>> | null
+    if (!parsed || typeof parsed !== "object") return {}
     return Object.fromEntries(
       Object.entries(parsed).map(([email, records]) => {
         const normalizedEmail = normalizeEmail(email)
@@ -67,17 +63,13 @@ async function readStore(): Promise<DraftStore> {
       })
     )
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return {}
     console.error("Failed to read generated drafts store:", error)
     return {}
   }
 }
 
 async function writeStore(store: DraftStore) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(store, null, 2), "utf8")
+  await setStore("generated-drafts", store)
 }
 
 export async function listGeneratedDraftsForUser(email?: string | null) {
@@ -107,7 +99,7 @@ export async function saveGeneratedDraft(record: GeneratedDraftRecord) {
 
 export async function resetGeneratedDraftsStore() {
   try {
-    await rm(STORE_FILE, { force: true })
+    await setStore("generated-drafts", {})
   } catch (error) {
     console.error("Failed to reset generated drafts store:", error)
   }

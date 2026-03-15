@@ -217,3 +217,13 @@ This repo includes an isolated meeting-agent prototype and docs:
 - docs/INTEGRATION.md
 
 These files are preserved for future meeting-bot work and do not replace the current Google-first app flows.
+## Deploying to Vercel
+
+The app uses file-based storage (`.relay/*.json`) by default. On Vercel the filesystem is read-only, so persistence is switched to **Vercel KV** (or any Redis that provides `KV_REST_API_URL` and `KV_REST_API_TOKEN`) when those env vars are set.
+
+1. In the [Vercel Dashboard](https://vercel.com/dashboard), open your project → **Storage** → **Create Database**.
+2. Create a **KV** store (e.g. Upstash Redis). Link it to your project so Vercel injects `KV_REST_API_URL` and `KV_REST_API_TOKEN`.
+3. Set your other env vars (e.g. `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, Google OAuth, Recall, OpenAI) in the project’s **Settings → Environment Variables**.
+4. Redeploy. The app will use KV for Google tokens, meeting runs, user preferences, drafts, and other stores. Action approval state still uses the filesystem locally; on Vercel it may not persist until that store is migrated to the backend.
+
+**Google sign-in "redirect_uri_mismatch" on Vercel:** Add your app’s callback URL to the OAuth client in Google Cloud Console. See [docs/GOOGLE_OAUTH_VERCEL.md](docs/GOOGLE_OAUTH_VERCEL.md) for the exact URI and steps.

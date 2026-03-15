@@ -1,11 +1,7 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type { MeetingHistoryEntry } from "@/types"
-
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "meeting-history.json")
+import { getStore, setStore } from "./store-backend"
 
 function normalizeMeetingHistoryEntry(value: unknown): MeetingHistoryEntry | null {
   if (!value || typeof value !== "object") return null
@@ -59,25 +55,20 @@ function normalizeMeetingHistoryEntry(value: unknown): MeetingHistoryEntry | nul
 
 async function readAll(): Promise<MeetingHistoryEntry[]> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const parsed = JSON.parse(raw)
+    const parsed = await getStore("meeting-history")
     return Array.isArray(parsed)
       ? parsed
           .map(normalizeMeetingHistoryEntry)
           .filter((entry): entry is MeetingHistoryEntry => entry !== null)
       : []
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return []
     console.error("Failed to read meeting history store:", error)
     return []
   }
 }
 
 async function writeAll(entries: MeetingHistoryEntry[]) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(entries, null, 2), "utf8")
+  await setStore("meeting-history", entries)
 }
 
 export async function listMeetingHistoryEntries() {

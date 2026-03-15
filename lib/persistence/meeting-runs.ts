@@ -1,11 +1,7 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type { MeetingRunRecord, RecallTranscriptEntry } from "@/types"
-
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "meeting-runs.json")
+import { getStore, setStore } from "./store-backend"
 
 function normalizeRun(raw: unknown): MeetingRunRecord | null {
   if (!raw || typeof raw !== "object") return null
@@ -58,23 +54,18 @@ function normalizeRun(raw: unknown): MeetingRunRecord | null {
 
 async function readAll(): Promise<MeetingRunRecord[]> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const data = JSON.parse(raw)
+    const data = await getStore("meeting-runs")
     return Array.isArray(data)
       ? data.map(normalizeRun).filter((r): r is MeetingRunRecord => r !== null)
       : []
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return []
     console.error("Failed to read meeting runs store:", error)
     return []
   }
 }
 
 async function writeAll(runs: MeetingRunRecord[]) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(runs, null, 2), "utf8")
+  await setStore("meeting-runs", runs)
 }
 
 export async function listMeetingRuns(): Promise<MeetingRunRecord[]> {

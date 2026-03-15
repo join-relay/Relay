@@ -1,9 +1,8 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import { google } from "googleapis"
 import type { GoogleIntegrationStatus } from "@/types"
+import { getStore, setStore } from "@/lib/persistence/store-backend"
 import { getDevLiveDataState } from "@/lib/persistence/dev-test-state"
 import { decryptSecret, encryptSecret, isEncryptionConfigured } from "@/lib/security/encryption"
 
@@ -43,9 +42,6 @@ type GoogleTokenRecord = {
   updatedAt: string
 }
 
-const STORE_DIRECTORY = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIRECTORY, "google-connections.json")
-
 declare global {
   // eslint-disable-next-line no-var
   var __relayGoogleTokenStore: Map<string, GoogleTokenRecord> | undefined
@@ -58,23 +54,16 @@ function getTokenStore() {
 
 async function readPersistentStore(): Promise<Record<string, GoogleTokenRecord>> {
   try {
-    const contents = await readFile(STORE_FILE, "utf8")
-    return JSON.parse(contents) as Record<string, GoogleTokenRecord>
+    const data = await getStore("google-connections")
+    return (data && typeof data === "object" && data !== null) ? (data as Record<string, GoogleTokenRecord>) : {}
   } catch (error) {
-    const isMissingFile =
-      error instanceof Error && "code" in error && error.code === "ENOENT"
-    if (isMissingFile) {
-      return {}
-    }
-
     console.error("Failed to read Google connection store:", error)
     return {}
   }
 }
 
 async function writePersistentStore(records: Record<string, GoogleTokenRecord>) {
-  await mkdir(STORE_DIRECTORY, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(records, null, 2), "utf8")
+  await setStore("google-connections", records)
 }
 
 /** Persist a single updated record (e.g. after refresh) so file and in-memory stay in sync. */

@@ -1,7 +1,6 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
+import { getStore, setStore } from "@/lib/persistence/store-backend"
 import { getRelayCustomizationSettings } from "@/lib/persistence/user-preferences"
 import { getRecentSentEmailSamples } from "@/lib/services/gmail"
 import type {
@@ -17,8 +16,6 @@ import type {
   TonePreference,
 } from "@/types"
 
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "email-style-profiles.json")
 const PROFILE_STALE_MS = 1000 * 60 * 60 * 12
 const CURRENT_PROFILE_VERSION = 7
 
@@ -663,23 +660,19 @@ function analyzeSentMail(samples: SentEmailSample[], displayName?: string | null
 
 async function readStore(): Promise<EmailStyleStore> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const parsed = JSON.parse(raw) as Record<string, Partial<EmailStyleProfile>>
+    const parsed = (await getStore("email-style-profiles")) as Record<string, Partial<EmailStyleProfile>> | null
+    if (!parsed || typeof parsed !== "object") return {}
     return Object.fromEntries(
       Object.entries(parsed).map(([key, value]) => [key, normalizeStoredProfile(value)])
     )
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return {}
     console.error("Failed to read email style store:", error)
     return {}
   }
 }
 
 async function writeStore(records: EmailStyleStore) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(records, null, 2), "utf8")
+  await setStore("email-style-profiles", records)
 }
 
 function isFresh(profile?: EmailStyleProfile) {

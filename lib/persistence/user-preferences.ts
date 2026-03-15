@@ -1,7 +1,5 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type {
   ConcisenessPreference,
   FormalityPreference,
@@ -10,8 +8,7 @@ import type {
   TonePreference,
 } from "@/types"
 
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "user-preferences.json")
+import { getStore, setStore } from "./store-backend"
 
 type PreferenceRecord = Record<string, RelayCustomizationSettings>
 
@@ -106,23 +103,19 @@ function normalizeSettings(value: unknown): RelayCustomizationSettings {
 
 async function readStore(): Promise<PreferenceRecord> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const parsed = (await getStore("user-preferences")) as Record<string, unknown> | null
+    if (!parsed || typeof parsed !== "object") return {}
     return Object.fromEntries(
       Object.entries(parsed).map(([key, value]) => [key, normalizeSettings(value)])
     )
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return {}
     console.error("Failed to read user preferences store:", error)
     return {}
   }
 }
 
 async function writeStore(records: PreferenceRecord) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(records, null, 2), "utf8")
+  await setStore("user-preferences", records)
 }
 
 export async function getRelayCustomizationSettings(email?: string | null) {

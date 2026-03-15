@@ -1,11 +1,7 @@
 import "server-only"
 
-import { mkdir, readFile, writeFile } from "node:fs/promises"
-import path from "node:path"
 import type { CalendarEvent, GmailThread, GmailThreadContext, SentEmailSample } from "@/types"
-
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "dev-test-state.json")
+import { getStore, setStore } from "./store-backend"
 
 export interface RelayDevLiveDataState {
   enabled: boolean
@@ -32,21 +28,17 @@ function getInMemoryState() {
 
 async function readStore(): Promise<RelayDevTestState> {
   try {
-    const raw = await readFile(STORE_FILE, "utf8")
-    if (!raw.trim()) return {}
-    return JSON.parse(raw) as RelayDevTestState
+    const data = await getStore("dev-test-state")
+    if (!data || typeof data !== "object") return {}
+    return data as RelayDevTestState
   } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return {}
     console.error("Failed to read dev test state:", error)
     return {}
   }
 }
 
 async function writeStore(state: RelayDevTestState) {
-  await mkdir(STORE_DIR, { recursive: true })
-  await writeFile(STORE_FILE, JSON.stringify(state, null, 2), "utf8")
+  await setStore("dev-test-state", state)
 }
 
 export async function getDevLiveDataState() {
