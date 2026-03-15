@@ -3,3 +3,10 @@ node_modules
 .env*.local
 *.db
 data/
+
+# From main (merged)
+out/
+dist/
+.vercel/
+.DS_Store
+Thumbs.db
