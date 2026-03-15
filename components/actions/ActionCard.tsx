@@ -14,6 +14,7 @@ interface ActionCardProps {
   onEditContent: (id: string, content: DraftEmailPayload | RescheduleMeetingPayload) => void
   isApproving?: boolean
   isRejecting?: boolean
+  source?: "mock" | "google"
 }
 
 const urgencyStyles = {
@@ -35,6 +36,7 @@ export function ActionCard({
   onEditContent,
   isApproving = false,
   isRejecting = false,
+  source = "mock",
 }: ActionCardProps) {
   const [expanded, setExpanded] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
@@ -135,6 +137,7 @@ export function ActionCard({
                 onEdit={action.type === "draft_email" ? handleEditClick : undefined}
                 isApproving={isApproving}
                 isRejecting={isRejecting}
+                source={source}
               />
             </>
           )}

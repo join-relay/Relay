@@ -15,7 +15,7 @@ export function ActionsPageHeader({
   urgentCount,
   conflictCount = 0,
   sourceLabel = "Demo Actions",
-  statusNote = "Actions stay review-only and mock-backed in this pass. Real Gmail send and Calendar changes come later.",
+  statusNote = "Relay is showing explicit demo fallback actions until live Gmail and Calendar actions are available.",
 }: ActionsPageHeaderProps) {
   const hasUrgency = urgentCount > 0 || conflictCount > 0
   const summaryLine =

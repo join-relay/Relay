@@ -3,12 +3,23 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ActionsPageHeader } from "@/components/actions/ActionsPageHeader"
 import { ActionCard } from "@/components/actions/ActionCard"
-import type { PendingAction, DraftEmailPayload, RescheduleMeetingPayload } from "@/types"
+import type {
+  ActionsViewState,
+  PendingAction,
+  DraftEmailPayload,
+  RescheduleMeetingPayload,
+} from "@/types"
 
-async function fetchActions() {
+interface ActionsResponse {
+  actions: PendingAction[]
+  displayName: string | null
+  viewState: ActionsViewState
+}
+
+async function fetchActions(): Promise<ActionsResponse> {
   const res = await fetch("/api/actions")
   if (!res.ok) throw new Error("Failed to load actions")
-  return res.json() as Promise<PendingAction[]>
+  return res.json() as Promise<ActionsResponse>
 }
 
 async function approveAction(id: string) {
@@ -50,10 +61,15 @@ async function editAction(id: string, content: DraftEmailPayload | RescheduleMee
 
 export default function ActionsPage() {
   const queryClient = useQueryClient()
-  const { data: actions = [], isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["actions"],
     queryFn: fetchActions,
   })
+  const actions = data?.actions ?? []
+  const viewState = data?.viewState ?? {
+    source: "mock" as const,
+    statusNote: "Relay is showing explicit demo fallback actions.",
+  }
 
   const approveMutation = useMutation({
     mutationFn: approveAction,
@@ -104,8 +120,8 @@ export default function ActionsPage() {
           pendingCount={pendingActions.length}
           urgentCount={urgentCount}
           conflictCount={conflictCount}
-          sourceLabel="Demo Actions"
-          statusNote="These suggested replies and reschedules are still seeded examples in this pass. They are reviewable, but not pulled from your live Gmail yet."
+          sourceLabel={viewState.source === "google" ? "Live Actions" : "Demo Actions"}
+          statusNote={viewState.statusNote}
         />
       </div>
       <div className="space-y-4 animate-relay-fade-in opacity-0 [animation-delay:75ms] [animation-fill-mode:forwards]">
@@ -123,6 +139,7 @@ export default function ActionsPage() {
               onEditContent={(id, content) => editMutation.mutate({ id, content })}
               isApproving={approveMutation.isPending && approveMutation.variables === action.id}
               isRejecting={rejectMutation.isPending && rejectMutation.variables === action.id}
+              source={viewState.source}
             />
           ))
         )}

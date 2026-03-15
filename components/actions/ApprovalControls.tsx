@@ -8,6 +8,7 @@ interface ApprovalControlsProps {
   onEdit?: () => void
   isApproving?: boolean
   isRejecting?: boolean
+  source?: "mock" | "google"
 }
 
 export function ApprovalControls({
@@ -16,11 +17,14 @@ export function ApprovalControls({
   onEdit,
   isApproving = false,
   isRejecting = false,
+  source = "mock",
 }: ApprovalControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="w-full text-xs text-[#3F5363]">
-        Relay never executes without your review in Demo Mode.
+        {source === "google"
+          ? "Relay never executes without your review."
+          : "Relay never executes without your review in demo fallback mode."}
       </p>
       <div className="flex flex-wrap gap-2">
         <button

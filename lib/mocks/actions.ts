@@ -1,6 +1,11 @@
 import type { PendingAction } from "@/types"
 
-export const seededActions: Omit<PendingAction, "status" | "reviewedContent" | "executedAt" | "executionSummary">[] = [
+export type StoredPendingAction = Omit<
+  PendingAction,
+  "status" | "reviewedContent" | "executedAt" | "executionSummary"
+>
+
+export const seededActions: StoredPendingAction[] = [
   {
     id: "a1",
     type: "draft_email",
@@ -50,7 +55,7 @@ export const seededActions: Omit<PendingAction, "status" | "reviewedContent" | "
   },
 ]
 
-/** Demo-only in-memory store for action status. Persists across API calls during dev server lifetime. */
+/** In-memory action state persists across API calls during the dev server lifetime. */
 export interface ActionStoreEntry {
   status: "pending" | "approved" | "rejected"
   reviewedContent?: PendingAction["proposedAction"]
@@ -60,6 +65,16 @@ export interface ActionStoreEntry {
 
 const actionStore = new Map<string, ActionStoreEntry>()
 
+declare global {
+  // eslint-disable-next-line no-var
+  var __relayActionBaseStore: Map<string, StoredPendingAction> | undefined
+}
+
+function getActionBaseStore() {
+  globalThis.__relayActionBaseStore ??= new Map()
+  return globalThis.__relayActionBaseStore
+}
+
 function getEntry(id: string): ActionStoreEntry | undefined {
   return actionStore.get(id)
 }
@@ -68,14 +83,34 @@ function setEntry(id: string, entry: ActionStoreEntry): void {
   actionStore.set(id, entry)
 }
 
+function formatExecutionTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+  } catch {
+    return iso
+  }
+}
+
 export function getActionStatus(id: string): ActionStoreEntry | undefined {
   return getEntry(id)
 }
 
-export function getSeededActionById(
-  id: string
-): Omit<PendingAction, "status" | "reviewedContent" | "executedAt" | "executionSummary"> | undefined {
-  return seededActions.find((action) => action.id === id)
+export function rememberActionBases(actions: StoredPendingAction[]) {
+  const store = getActionBaseStore()
+  for (const action of actions) {
+    store.set(action.id, action)
+  }
+}
+
+export function getStoredActionById(id: string): StoredPendingAction | undefined {
+  return getActionBaseStore().get(id) ?? seededActions.find((action) => action.id === id)
+}
+
+export function getStoredActions(): StoredPendingAction[] {
+  return Array.from(getActionBaseStore().values())
 }
 
 export function setActionApproved(
@@ -87,7 +122,7 @@ export function setActionApproved(
     reviewedContent && "subject" in reviewedContent
       ? `Reply sent to ${(reviewedContent as { to?: string }).to ?? "recipient"}`
       : reviewedContent && "eventTitle" in reviewedContent
-        ? `${(reviewedContent as { eventTitle: string }).eventTitle} rescheduled to 11:30 AM`
+        ? `${(reviewedContent as { eventTitle: string; proposedStart: string }).eventTitle} rescheduled to ${formatExecutionTime((reviewedContent as { proposedStart: string }).proposedStart)}`
         : "Action executed"
   setEntry(id, {
     status: "approved",
@@ -112,7 +147,7 @@ export function setActionEditedContent(
   })
 }
 
-export function mergeActionWithStore(base: Omit<PendingAction, "status" | "reviewedContent" | "executedAt" | "executionSummary">): PendingAction {
+export function mergeActionWithStore(base: StoredPendingAction): PendingAction {
   const entry = getEntry(base.id)
   const status = entry?.status ?? "pending"
   return {

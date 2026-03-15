@@ -1,10 +1,21 @@
 import { NextResponse } from "next/server"
-import { listActions } from "@/lib/services/actions"
+import { getOptionalSession } from "@/auth"
+import { listActions, substituteDisplayNameInActions } from "@/lib/services/actions"
 
 export async function GET() {
   try {
-    const actions = await listActions()
-    return NextResponse.json(actions)
+    const session = await getOptionalSession()
+    const displayName = session?.user?.name ?? undefined
+    const result = await listActions()
+    let actions = result.actions
+    if (displayName) {
+      actions = substituteDisplayNameInActions(actions, displayName)
+    }
+    return NextResponse.json({
+      actions,
+      displayName: displayName ?? null,
+      viewState: result.viewState,
+    })
   } catch (error) {
     console.error("Actions API error:", error)
     return NextResponse.json(
