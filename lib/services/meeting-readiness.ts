@@ -11,6 +11,8 @@ import {
   getUpcomingGoogleMeet,
   isGoogleMeetEvent,
 } from "@/lib/services/calendar"
+import { getRecallProviderReadiness } from "@/lib/services/recall"
+import { listMeetingRuns } from "@/lib/persistence/meeting-runs"
 import type {
   IntegrationState,
   MeetingIntegrationCheckpoint,
@@ -45,6 +47,7 @@ function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = MEETING_
 }
 
 export function buildMeetingReadinessErrorStatus(message: string): MeetingReadinessStatus {
+  const providerReadiness = getRecallProviderReadiness()
   return {
     botIdentity: BOT_LABEL,
     resolutionState: "error",
@@ -98,6 +101,7 @@ export function buildMeetingReadinessErrorStatus(message: string): MeetingReadin
     ],
     nextMeeting: null,
     lastLinkCheck,
+    providerReadiness,
     customizationSummary: "Future meeting writing settings are unavailable for this failed request.",
     summarySurface: {
       state: "empty",
@@ -117,6 +121,7 @@ export function buildMeetingReadinessErrorStatus(message: string): MeetingReadin
 
 export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatus> {
   const session = await getOptionalSession()
+  const providerReadiness = getRecallProviderReadiness()
   const customization = await getRelayCustomizationSettings(session?.user?.email)
   const baseStatus = await getBaseGoogleIntegrationStatus({
     email: session?.user?.email,
@@ -206,6 +211,42 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
       : "fallback"
   const hasUpcomingMeeting = Boolean(nextMeeting)
 
+  let activeRecallRun: MeetingReadinessStatus["activeRecallRun"] = null
+  let transcriptSurface: MeetingReadinessStatus["transcriptSurface"] = {
+    state: hasUpcomingMeeting ? "pending" : "empty",
+    previewLines: [],
+    note: hasUpcomingMeeting
+      ? "No Google Meet summary or transcript artifacts are attached yet. Relay will only show them after a real artifact path exists."
+      : "No upcoming or recorded Google Meet artifact is available yet, so transcript preview stays empty.",
+  }
+  try {
+    const runs = await listMeetingRuns()
+    const latestRun = runs[0] ?? null
+    if (latestRun) {
+      activeRecallRun = latestRun
+      const lines = (latestRun.transcriptEntries ?? [])
+        .map((e) => (e.speaker ? `${e.speaker}: ${e.text}` : e.text))
+        .filter(Boolean)
+      if (lines.length > 0) {
+        transcriptSurface = {
+          state: "available",
+          previewLines: lines,
+          note: `Transcript from Recall bot (${lines.length} utterance(s)).`,
+        }
+      } else {
+        transcriptSurface = {
+          state: latestRun.status === "running" || latestRun.status === "joining" ? "pending" : "empty",
+          previewLines: [],
+          note: latestRun.providerStatus
+            ? `Bot status: ${latestRun.providerStatus}. No transcript received yet.`
+            : "No transcript data received yet for this run.",
+        }
+      }
+    }
+  } catch {
+    // keep default transcriptSurface and activeRecallRun null
+  }
+
   return {
     botIdentity,
     resolutionState,
@@ -226,6 +267,8 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
     checkpoints,
     nextMeeting,
     lastLinkCheck,
+    providerReadiness,
+    activeRecallRun,
     customizationSummary: `Future meeting writing is set to ${customization.meetingUpdateStyle.replaceAll(
       "_",
       " "
@@ -238,13 +281,7 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
       state: hasUpcomingMeeting ? "pending" : "empty",
       items: [],
     },
-    transcriptSurface: {
-      state: hasUpcomingMeeting ? "pending" : "empty",
-      previewLines: [],
-      note: hasUpcomingMeeting
-        ? "No Google Meet summary or transcript artifacts are attached yet. Relay will only show them after a real artifact path exists."
-        : "No upcoming or recorded Google Meet artifact is available yet, so transcript preview stays empty.",
-    },
+    transcriptSurface,
   }
 }
 
