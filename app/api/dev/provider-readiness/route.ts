@@ -61,7 +61,7 @@ export async function GET() {
         const dotenv = require("dotenv")
         const raw = fs.readFileSync(envLocalPath, "utf8")
         envLocalHasRecallKeys = raw.includes("RECALL_")
-        envLocalLineCount = raw.split(/\r?\n/).filter((l) => l.trim().length > 0).length
+        envLocalLineCount = raw.split(/\r?\n/).filter((l: string) => l.trim().length > 0).length
         const result = dotenv.config({ path: envLocalPath, override: true })
         if (result?.parsed) loadedEnvFiles = [{ path: ".env.local" }]
       } catch {
