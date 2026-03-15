@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Env (never commit keys)
+.env
+.env.local
+.env.*.local
+
+# Build / IDE
+.next/
+out/
+dist/
+*.tsbuildinfo
+.vercel/
+
+# OS
+.DS_Store
+Thumbs.db
