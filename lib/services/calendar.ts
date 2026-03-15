@@ -1,7 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
-import type { CalendarEvent } from "@/types"
+import type { CalendarEvent, CalendarEventAttendee } from "@/types"
 import {
   clearGoogleAccountConnection,
   getGoogleAccessToken,
@@ -171,7 +171,7 @@ export async function getLiveCalendarEvents(email?: string | null, limit = 25): 
 }
 
 /** Parse our composite event id into calendarId and eventId for the API. */
-function parseEventId(compositeId: string): { calendarId: string; eventId: string } {
+export function parseEventId(compositeId: string): { calendarId: string; eventId: string } {
   const colon = compositeId.indexOf(":")
   if (colon >= 0) {
     return {
@@ -180,6 +180,51 @@ function parseEventId(compositeId: string): { calendarId: string; eventId: strin
     }
   }
   return { calendarId: "primary", eventId: compositeId }
+}
+
+/** Fetch a single calendar event by composite id with description and attendees. */
+export async function getCalendarEventById(
+  email: string | null | undefined,
+  compositeEventId: string
+): Promise<CalendarEvent | null> {
+  const accessToken = await getGoogleAccessToken(email)
+  if (!accessToken) return null
+
+  try {
+    const calendar = google.calendar({
+      version: "v3",
+      auth: getGoogleOAuthClient(accessToken),
+    })
+    const { calendarId, eventId } = parseEventId(compositeEventId)
+    const res = await calendar.events.get({
+      calendarId,
+      eventId,
+    })
+    const event = res.data
+    const joinUrl = getGoogleMeetLink(event)
+    const attendees: CalendarEventAttendee[] = (event.attendees ?? []).map((a) => ({
+      email: a.email ?? undefined,
+      displayName: a.displayName ?? undefined,
+      responseStatus: (a.responseStatus as CalendarEventAttendee["responseStatus"]) ?? undefined,
+    }))
+    return {
+      id: compositeEventId,
+      title: event.summary ?? "(Untitled event)",
+      start: getEventDate(event.start),
+      end: getEventDate(event.end),
+      location: event.location ?? (joinUrl ? "Google Meet" : undefined),
+      isAllDay: Boolean(event.start?.date && !event.start?.dateTime),
+      provider: "google",
+      meetingProvider: joinUrl?.includes("meet.google.com") ? "google_meet" : undefined,
+      joinUrl,
+      externalEventId: event.iCalUID ?? event.id ?? undefined,
+      isMeeting: Boolean(joinUrl),
+      description: event.description ?? undefined,
+      attendees: attendees.length > 0 ? attendees : undefined,
+    }
+  } catch {
+    return null
+  }
 }
 
 /** Reschedule a calendar event. Requires calendar.events scope. */

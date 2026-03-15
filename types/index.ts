@@ -8,6 +8,12 @@ export interface GmailThread {
   labels?: string[]
 }
 
+export interface CalendarEventAttendee {
+  email?: string
+  displayName?: string
+  responseStatus?: "needsAction" | "declined" | "tentative" | "accepted"
+}
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -22,6 +28,10 @@ export interface CalendarEvent {
   joinUrl?: string
   externalEventId?: string
   isMeeting?: boolean
+  /** Full event description/body (from Calendar API when fetching single event). */
+  description?: string
+  /** Attendees (from Calendar API when fetching single event). */
+  attendees?: CalendarEventAttendee[]
 }
 
 export interface PriorityItem {
@@ -165,4 +175,83 @@ export interface GoogleIntegrationStatus {
   canUseLiveBriefing: boolean
   nextMeetEvent?: CalendarEvent | null
   note: string
+}
+
+// ——— Google Meet AI attendee (artifact-based) ———
+
+/** Source of meeting/recap data: artifact (post-Meet), live (not implemented), or fallback. */
+export type MeetingDataSource = "artifact" | "live" | "fallback" | "unavailable"
+
+/** Whether Meet REST artifacts/transcript are available. */
+export type MeetArtifactAvailability =
+  | "available"
+  | "unavailable"
+  | "not_checked"
+  | "permission_denied"
+  | "api_not_supported"
+
+export interface MeetingContext {
+  eventId: string
+  event: CalendarEvent
+  /** Agenda/description text. */
+  agendaText: string
+  attendees: CalendarEventAttendee[]
+  /** Drive files already linked in Relay (selected for user). */
+  linkedDriveFiles: { id: string; name: string; mimeType?: string; webViewLink?: string }[]
+  /** Recent Gmail context (threads) already available in the app. */
+  gmailSummary: { threads: GmailThread[]; total: number }
+  /** Recent approved Relay actions (execution records). */
+  recentApprovedActions: ActionExecutionRecord[]
+  /** Current briefing summary if available (e.g. priorities, today's date). */
+  briefingSummary?: { date: string; prioritiesCount: number; upcomingMeetingTitle?: string }
+  /** When context was assembled. */
+  assembledAt: string
+}
+
+export interface MeetingBrief {
+  eventId: string
+  userEmail?: string | null
+  /** Pre-meeting brief text. */
+  briefText: string
+  /** "What you've been working on" update text. */
+  workingOnUpdate: string
+  /** Suggested spoken/typed update text for the meeting. */
+  suggestedUpdateText: string
+  source: MeetingDataSource
+  generatedAt: string
+}
+
+export interface SpokenUpdateArtifactMetadata {
+  eventId: string
+  userEmail?: string | null
+  /** Whether TTS artifact was generated (URL or stored ref). */
+  generated: boolean
+  /** Optional storage path or URL for the audio artifact. */
+  artifactUrl?: string
+  failureReason?: string
+  generatedAt: string
+}
+
+export interface MeetArtifactState {
+  eventId: string
+  availability: MeetArtifactAvailability
+  /** Transcript text when availability is "available". */
+  transcriptText?: string
+  /** Raw artifact payload when available (e.g. for recap). */
+  rawPayload?: unknown
+  failureReason?: string
+  checkedAt: string
+}
+
+export interface MeetingRecap {
+  eventId: string
+  userEmail?: string | null
+  /** Summary of decisions, blockers, next steps, follow-ups. */
+  decisions: string[]
+  blockers: string[]
+  nextSteps: string[]
+  suggestedFollowUp: string[]
+  recapSummary: string
+  source: MeetingDataSource
+  generatedAt: string
 }
