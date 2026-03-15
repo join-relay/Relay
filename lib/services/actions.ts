@@ -1349,7 +1349,9 @@ function deriveLiveRescheduleActions(events: CalendarEvent[]): PendingActionBase
 function hydrateActions(actions: PendingActionBase[], source: ActionsViewState["source"]) {
   const normalizedActions = actions.map(withNormalizedProvenance)
   rememberActionBases(normalizedActions)
-  const merged = normalizedActions.map(mergeActionWithStore)
+  const merged = normalizedActions
+    .map(mergeActionWithStore)
+    .filter((a) => a.status !== "rejected")
 
   if (source !== "google") {
     return merged
@@ -1360,7 +1362,7 @@ function hydrateActions(actions: PendingActionBase[], source: ActionsViewState["
     .map(withNormalizedProvenance)
     .filter((action) => action.provenance.origin === "live" && !seen.has(action.id))
     .map(mergeActionWithStore)
-    .filter((action) => action.status !== "pending")
+    .filter((action) => action.status === "approved")
 
   return [...merged, ...carried].sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()

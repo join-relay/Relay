@@ -1,7 +1,6 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect } from "react"
 import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Mail, Video, History, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -19,12 +18,6 @@ export function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  useEffect(() => {
-    navItems.forEach((item) => {
-      router.prefetch(item.href)
-    })
-  }, [router])
-
   return (
     <aside className="fixed left-0 top-0 z-50 h-screen w-60 border-r border-[#61707D]/20 bg-white/95 backdrop-blur-sm">
       <div className="flex h-full flex-col">
@@ -39,7 +32,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                prefetch
+                prefetch={true}
                 onMouseEnter={() => router.prefetch(item.href)}
                 onFocus={() => router.prefetch(item.href)}
                 data-testid={`sidebar-${item.label.toLowerCase()}`}

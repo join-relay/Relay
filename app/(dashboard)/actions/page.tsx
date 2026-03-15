@@ -90,11 +90,29 @@ export default function ActionsPage() {
 
   const approveMutation = useMutation({
     mutationFn: approveAction,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY }),
+    onSuccess: (_, approvedId) => {
+      queryClient.setQueryData(
+        ACTIONS_QUERY_KEY,
+        (current: { actions: PendingAction[]; displayName: string | null; viewState: ActionsViewState } | undefined) =>
+          current
+            ? { ...current, actions: current.actions.filter((a) => a.id !== approvedId) }
+            : current
+      )
+      queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY })
+    },
   })
   const rejectMutation = useMutation({
     mutationFn: rejectAction,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY }),
+    onSuccess: (_, rejectedId) => {
+      queryClient.setQueryData(
+        ACTIONS_QUERY_KEY,
+        (current: { actions: PendingAction[]; displayName: string | null; viewState: ActionsViewState } | undefined) =>
+          current
+            ? { ...current, actions: current.actions.filter((a) => a.id !== rejectedId) }
+            : current
+      )
+      queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY })
+    },
   })
   const editMutation = useMutation({
     mutationFn: ({ id, content }: { id: string; content: DraftEmailPayload | RescheduleMeetingPayload }) =>
