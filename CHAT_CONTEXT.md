@@ -2,15 +2,18 @@
 
 This file summarizes the project and what was done in this chat so a future AI or you can pick up context quickly.
 
+**Habit:** When chat context usage reaches **~75%**, update this file with a short summary of the session so the next turn (or a new chat) can continue without losing context.
+
 ---
 
 ## What this project is
 
 **Work-Life & Wellbeing Analyzer** — A Next.js app that:
 
-- Lets users sign in with **Google (G Suite)** or **Microsoft (Outlook)**.
+- Lets users sign in with **Google (G Suite)** or **Microsoft (Outlook)**, or use **“See demo”** (demo mode with mock data).
 - Syncs **email** and **calendar** (and for Google only: Meet, Docs) to build a work-life context.
-- Shows an **8-bit Pokémon-style** dashboard with a pixel character, ENERGY/LOAD bars, and a “STATUS” + “WHY (from your G Suite/Outlook)” section.
+- Shows an **8-bit-style** dashboard with a pixel character, ENERGY/LOAD bars, and a single natural-language **Summary** (e.g. “You’ve got a stressful schedule! Next up is …”) from schedule/context.
+- **Character customizer:** Custom (head, torso, hair, skin, eyes, mouth, shirt) or **Preset** 8-bit icons (knight, moon, star, heart, sun, shield). Stored in localStorage; Terraria-style arrows (no text labels) for options.
 - Supports **wellbeing check-ins** (energy 1–5, overwhelm 1–5, optional note) stored with a snapshot of current work context.
 - **Phase 1 is analysis only** — no automated actions (no sending email, creating events, etc.).
 
@@ -51,16 +54,20 @@ gsuite-wellbeing-analyzer/
 │   │       ├── context/route.ts         # GET → work-life context + provider
 │   │       └── wellbeing/route.ts      # GET/POST check-ins
 │   ├── components/
-│   │   ├── Dashboard.tsx       # Calendar, Email, Meet, Docs sections; labels by provider
-│   │   ├── ProfileOverview.tsx # Pixel character, ENERGY/LOAD bars, STATUS, WHY
-│   │   ├── WellbeingCheckIn.tsx# Form: energy, overwhelm, note
-│   │   └── PixelCharacter.tsx  # 8-bit character (mood by energy/overwhelm)
+│   │   ├── Dashboard.tsx       # Calendar, Email, Meet, Docs; event colors by type; email list scroll, pin/star
+│   │   ├── ProfileOverview.tsx # Character (xl), ENERGY/LOAD, Summary, character customizer (Custom/Preset)
+│   │   ├── CharacterDisplay.tsx# Renders custom or preset pixel character (176px)
+│   │   ├── PixelCharacter.tsx  # 8-bit character (mood by energy/overwhelm)
+│   │   └── WellbeingCheckIn.tsx# Form: energy, overwhelm, note
 │   ├── lib/
-│   │   ├── store.ts            # Token store (provider + google/microsoft), context store, wellbeing
+│   │   ├── store.ts            # Token store, context store, wellbeing
+│   │   ├── profile-character.ts# Character profile (mode, iconId, hair, skin, etc.) in localStorage
+│   │   ├── schedule-summary.ts # Natural-language summary from schedule/context
+│   │   ├── demo-context.ts     # Mock context for demo mode
 │   │   ├── google-auth.ts      # Google OAuth URL, token exchange, getValidAuthClient
-│   │   ├── microsoft-auth.ts   # Microsoft auth URL, token exchange, refresh, getValidMicrosoftAccessToken
-│   │   ├── gmail.ts            # syncGmail(auth) → EmailMessage[]
-│   │   ├── calendar.ts         # syncCalendar(auth) → CalendarEvent[]
+│   │   ├── microsoft-auth.ts   # Microsoft auth URL, token exchange, refresh
+│   │   ├── gmail.ts            # syncGmail(auth) → EmailMessage[] (HTML entity decode)
+│   │   ├── calendar.ts         # syncCalendar(auth) → CalendarEvent[] (location); today+tomorrow, max 10
 │   │   ├── docs.ts             # syncDocs(auth) → DocSummary[]
 │   │   ├── outlook.ts          # syncOutlook(accessToken) → EmailMessage[]
 │   │   ├── calendar-microsoft.ts # syncMicrosoftCalendar(accessToken) → CalendarEvent[]
@@ -82,10 +89,16 @@ gsuite-wellbeing-analyzer/
 
 ---
 
-## Fixes applied in this chat
+## Changes and fixes (session summary)
 
-1. **`src/lib/microsoft-auth.ts` line 12:** Typo `SCOPES.join(" "")` → `SCOPES.join(" ")` (extra quote caused build error).
-2. **Dashboard overflow:** Section and email list overflow fixed with `min-w-0`, `overflow-hidden`, `break-words`, `break-all` on grid, Section, and list items so long senders/subjects/snippets wrap instead of overflowing.
+- **Login:** “See demo” link for demo mode (mock data); sign-in buttons same height, company colors (Microsoft blue, Google blue).
+- **Theme:** More horizontal space (e.g. `max-w-[1600px]`), teal/slate palette; profile avatar as circular person icon with ring by state.
+- **Emails:** HTML entities decoded (e.g. `&#39;` → `'`) in display and at sync; list scrollable (40 items), star for important, pin-to-top in localStorage; fixed-height row (~560px) so list scrolls.
+- **Calendar:** Events as colored rectangles (meeting=red, gathering=green, 1:1=blue, etc.) with location; today + tomorrow, max 10; grid left-to-right then top-to-bottom; `location` on type and sync.
+- **Profile/Summary:** STATUS + WHY replaced by single natural-language **Summary** from `src/lib/schedule-summary.ts`.
+- **Character customizer:** Custom (head, torso, hair, skin, eyes, mouth, shirt) and Preset 8-bit icons (knight, moon, star, heart, sun, shield); profile in localStorage (`src/lib/profile-character.ts`); Terraria-style arrows only (no text labels); character preview xl (176px).
+- **Deploy:** Pushed to **Abdul's-Branch** on https://github.com/join-relay/Relay; steps in `DEPLOY.md` (PowerShell-safe: use `;` not `&&`, quote branch name).
+- **Earlier:** `microsoft-auth.ts` typo fix; dashboard overflow fixed with `min-w-0`, `overflow-hidden`, `break-words`, `break-all`.
 
 ---
 
