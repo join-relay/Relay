@@ -1,0 +1,174 @@
+# Relay — Digital Double
+# .cursorrules | Read this at the start of every session
+
+## What We're Building
+Relay is a digital double that represents you in meetings when your brain is overwhelmed.
+The core thesis: every other tool tells you what happened in a meeting you missed. Relay sends you instead.
+
+Relay is NOT a note-taker. It is an active participant that speaks your perspective, pushes back on your behalf, and makes judgment calls — then tells you what actually needs your attention afterward.
+
+---
+
+## The User Flow
+1. **Onboarding** — Conversational chat builds the "you-model" (5 min). Pulls context from Google Drive, GitHub, Google Calendar via OAuth.
+2. **Meeting Prep** — User pastes a meeting link + adds 2 min of async context ("push back on timeline, flexible on budget, don't agree to anything over $10k").
+3. **Relay Joins** — Bot joins Google Meet independently via Recall.ai. Listens via Whisper. Claude decides when/what to contribute. Posts in meeting chat. Optional ElevenLabs voice.
+4. **Debrief** — After the meeting: what was decided, what Relay said, what needs the real user. Confidence-scored. Clean and scannable.
+
+---
+
+## Stack
+- **Framework**: Next.js 14 (App Router)
+- **Styling**: Tailwind CSS
+- **Auth + OAuth**: NextAuth.js (Google OAuth for Drive, Calendar, Gmail)
+- **Meeting Bot**: Recall.ai API — joins Google Meet independently, streams transcript
+- **Transcription**: Whisper API (OpenAI) — chunked every 5s for near real-time
+- **AI / You-Model**: Claude API (claude-sonnet-4-6) — decision engine + response generation
+- **Voice (optional)**: ElevenLabs TTS
+- **Database**: Supabase (user profiles, you-model storage, meeting history)
+- **Deployment**: Vercel
+
+---
+
+## Folder Structure
+```
+relay/
+├── app/
+│   ├── (auth)/
+│   │   └── onboarding/        # Conversational you-model builder
+│   ├── dashboard/             # Main hub — upcoming meetings, debrief history
+│   ├── meeting/
+│   │   ├── prep/[id]/         # Pre-meeting async context input
+│   │   └── debrief/[id]/      # Post-meeting output
+│   └── api/
+│       ├── you-model/         # Build + retrieve user profile
+│       ├── recall/            # Recall.ai webhook handler
+│       ├── transcribe/        # Whisper chunked transcription
+│       ├── double/            # Core Claude decision engine
+│       └── debrief/           # Post-meeting summary generation
+├── lib/
+│   ├── you-model.ts           # You-model prompt construction
+│   ├── recall.ts              # Recall.ai client
+│   ├── whisper.ts             # Transcription helpers
+│   ├── claude.ts              # Claude API wrapper
+│   └── confidence.ts          # Confidence scoring logic
+├── components/
+│   ├── onboarding/            # Chat UI for you-model building
+│   ├── prep/                  # Meeting prep input interface
+│   └── debrief/               # Debrief dashboard components
+└── types/
+    └── index.ts               # Shared types
+```
+
+---
+
+## The You-Model (Most Important Thing)
+The you-model is a structured profile built from:
+- Onboarding conversation answers (communication style, priorities, how you handle conflict, decision-making patterns)
+- Google Drive docs (writing style, recurring projects, terminology)
+- Calendar context (who you meet with, recurring themes, seniority level)
+- Per-meeting async context (specific instructions for this meeting)
+
+It lives as a system prompt that is constructed fresh before every meeting. Structure:
+
+```
+You are acting as a digital double for [name].
+
+COMMUNICATION STYLE:
+[From onboarding — how they write, speak, their tone]
+
+CURRENT PRIORITIES:
+[From calendar + drive context — what they're working on]
+
+DECISION-MAKING PATTERNS:
+[From onboarding — what they care about, what they delegate, what they push back on]
+
+MEETING-SPECIFIC CONTEXT:
+[From pre-meeting prep — specific instructions for this meeting]
+
+JUDGMENT RULES:
+- Speak when directly addressed or when a decision is being made that affects stated priorities
+- Stay silent during status updates unless you have a specific correction
+- Escalate to the real user if: legal commitments, budget over stated threshold, anything marked as sensitive
+- Confidence < 0.7 = post in chat but flag for review. Confidence < 0.5 = escalate before speaking.
+```
+
+---
+
+## The Confidence System
+Every response the double generates gets a confidence score (0-1):
+- **> 0.8** → Relay speaks / posts without interrupting user
+- **0.6 - 0.8** → Relay contributes but flags it in the debrief
+- **< 0.6** → Relay pings the real user with a single yes/no before acting
+- **< 0.4** → Relay stays silent, notes it in debrief as "needed you here"
+
+This is what makes it feel like a double and not a bot.
+
+---
+
+## Debrief Output Format
+```
+MEETING: [title] | [date] | [duration]
+
+DECISIONS MADE
+- [decision] → Relay handled ✓
+- [decision] → You need to confirm ⚠️
+
+WHAT RELAY SAID
+- "[exact contribution]" — confidence: 0.87
+- "[exact contribution]" — confidence: 0.71 (flagged)
+
+WHAT NEEDS YOU
+- [item] — Relay wasn't confident enough to act
+- [item] — Outside Relay's stated authority
+
+YOU CAN IGNORE
+- [item] — Fully handled
+```
+
+---
+
+## Architecture Decisions
+- **No tab capture** — Recall.ai runs on their servers. User's machine can be closed.
+- **Chat contributions over voice for MVP** — More reliable for demo. ElevenLabs is additive.
+- **Chunked Whisper over real-time streaming** — Simpler, 3-5s latency is acceptable.
+- **Supabase over local storage** — You-model needs to persist across sessions.
+- **Google Meet only** — Don't touch Zoom for the hackathon.
+
+---
+
+## What to Cut If Time Is Short (Priority Order)
+1. ✅ Must have: You-model onboarding + Recall.ai joining + debrief dashboard
+2. ✅ Must have: Whisper transcription → Claude response → Google Meet chat injection
+3. ✅ Must have: Confidence scoring visible in debrief
+4. 🟡 Nice to have: Google Drive / Calendar context ingestion
+5. 🟡 Nice to have: Real-time escalation ping to user
+6. 🔴 Cut if needed: ElevenLabs voice
+7. 🔴 Cut if needed: Gmail integration
+
+---
+
+## Code Conventions
+- TypeScript everywhere, strict mode
+- All Claude prompts live in `/lib/you-model.ts` — never inline prompts in components
+- API routes handle one thing each — no fat endpoints
+- Every Recall.ai webhook handler must be idempotent
+- Comment the confidence scoring logic heavily — it's the core innovation
+- No `any` types
+
+---
+
+## Demo Script (Keep This In Mind While Building)
+1. Show the onboarding — "here's me teaching Relay how I think" (60s)
+2. Show meeting prep — "I have a meeting in 10 min, here's my context dump" (30s)
+3. Show Relay joining Google Meet independently — user's laptop is closed (30s)
+4. Show Relay contributing in chat during the meeting (60s)
+5. Show the debrief — "here's everything, here's what I need to act on" (30s)
+
+Total: ~3 min. Every feature built should serve this arc.
+
+---
+
+## Team Split
+- **Person 1 (you-model)**: Onboarding chat UI, Claude API integration, you-model prompt engineering, confidence scoring, debrief generation + dashboard
+- **Person 2 (pipeline)**: Recall.ai integration, Whisper chunked transcription, real-time transcript → Claude loop, Google Meet chat injection, frontend scaffolding
