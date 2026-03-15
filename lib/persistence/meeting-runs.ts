@@ -1,0 +1,154 @@
+import "server-only"
+
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import path from "node:path"
+import type { MeetingRunRecord, RecallTranscriptEntry } from "@/types"
+
+const STORE_DIR = path.join(process.cwd(), ".relay")
+const STORE_FILE = path.join(STORE_DIR, "meeting-runs.json")
+
+function normalizeRun(raw: unknown): MeetingRunRecord | null {
+  if (!raw || typeof raw !== "object") return null
+  const r = raw as Record<string, unknown>
+  if (
+    typeof r.id !== "string" ||
+    r.provider !== "recall_ai" ||
+    typeof r.meetingUrl !== "string" ||
+    typeof r.createdAt !== "string" ||
+    typeof r.updatedAt !== "string"
+  ) {
+    return null
+  }
+  const validStatuses = ["scaffolded", "created", "joining", "running", "completed", "failed"] as const
+  const status = validStatuses.includes(r.status as (typeof validStatuses)[number])
+    ? (r.status as MeetingRunRecord["status"])
+    : "scaffolded"
+
+  const transcriptEntries: RecallTranscriptEntry[] = Array.isArray(r.transcriptEntries)
+    ? (r.transcriptEntries as unknown[]).filter((e): e is RecallTranscriptEntry => {
+        if (!e || typeof e !== "object") return false
+        const x = e as Record<string, unknown>
+        return typeof (x.text as string) === "string"
+      }).map((e) => ({
+        speaker: typeof (e as RecallTranscriptEntry).speaker === "string" ? (e as RecallTranscriptEntry).speaker : undefined,
+        text: (e as RecallTranscriptEntry).text,
+        startedAt: typeof (e as RecallTranscriptEntry).startedAt === "string" ? (e as RecallTranscriptEntry).startedAt : undefined,
+        endedAt: typeof (e as RecallTranscriptEntry).endedAt === "string" ? (e as RecallTranscriptEntry).endedAt : undefined,
+      }))
+    : []
+
+  const artifactMetadata = r.artifactMetadata && typeof r.artifactMetadata === "object"
+    ? (r.artifactMetadata as MeetingRunRecord["artifactMetadata"])
+    : undefined
+
+  return {
+    id: r.id,
+    provider: "recall_ai",
+    meetingUrl: r.meetingUrl,
+    botId: typeof r.botId === "string" ? r.botId : undefined,
+    status,
+    providerStatus: typeof r.providerStatus === "string" ? r.providerStatus : undefined,
+    providerError: typeof r.providerError === "string" ? r.providerError : undefined,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    artifactMetadata,
+    transcriptEntries,
+  }
+}
+
+async function readAll(): Promise<MeetingRunRecord[]> {
+  try {
+    const raw = await readFile(STORE_FILE, "utf8")
+    const data = JSON.parse(raw)
+    return Array.isArray(data)
+      ? data.map(normalizeRun).filter((r): r is MeetingRunRecord => r !== null)
+      : []
+  } catch (error) {
+    const isMissing =
+      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
+    if (isMissing) return []
+    console.error("Failed to read meeting runs store:", error)
+    return []
+  }
+}
+
+async function writeAll(runs: MeetingRunRecord[]) {
+  await mkdir(STORE_DIR, { recursive: true })
+  await writeFile(STORE_FILE, JSON.stringify(runs, null, 2), "utf8")
+}
+
+export async function listMeetingRuns(): Promise<MeetingRunRecord[]> {
+  const runs = await readAll()
+  return runs.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+}
+
+export async function getMeetingRunById(id: string): Promise<MeetingRunRecord | null> {
+  const runs = await readAll()
+  return runs.find((r) => r.id === id) ?? null
+}
+
+export async function getMeetingRunByBotId(botId: string): Promise<MeetingRunRecord | null> {
+  const runs = await readAll()
+  return runs.find((r) => r.botId === botId) ?? null
+}
+
+export async function upsertMeetingRun(
+  run: MeetingRunRecord
+): Promise<MeetingRunRecord> {
+  const runs = await readAll()
+  const index = runs.findIndex((r) => r.id === run.id || (run.botId && r.botId === run.botId))
+  const updated = { ...run, updatedAt: new Date().toISOString() }
+  if (index >= 0) {
+    runs[index] = { ...runs[index], ...updated }
+  } else {
+    runs.push(updated)
+  }
+  await writeAll(runs)
+  return updated
+}
+
+export async function updateMeetingRunByBotId(
+  botId: string,
+  patch: Partial<Pick<MeetingRunRecord, "status" | "providerStatus" | "providerError" | "updatedAt">>
+): Promise<MeetingRunRecord | null> {
+  const runs = await readAll()
+  const index = runs.findIndex((r) => r.botId === botId)
+  if (index < 0) return null
+  const updated = {
+    ...runs[index],
+    ...patch,
+    updatedAt: patch.updatedAt ?? new Date().toISOString(),
+  }
+  runs[index] = updated
+  await writeAll(runs)
+  return updated
+}
+
+export async function appendTranscriptToRun(
+  botId: string,
+  entry: RecallTranscriptEntry
+): Promise<MeetingRunRecord | null> {
+  const runs = await readAll()
+  const index = runs.findIndex((r) => r.botId === botId)
+  if (index < 0) return null
+  const run = runs[index]
+  const transcriptEntries = [...(run.transcriptEntries ?? []), entry]
+  const artifactMetadata = {
+    ...(run.artifactMetadata ?? {
+      transcriptSource: "recall_transcript" as const,
+      recordingSource: "none" as const,
+      transcriptEntries: 0,
+    }),
+    transcriptSource: "recall_transcript" as const,
+    transcriptEntries: transcriptEntries.length,
+  }
+  const updated: MeetingRunRecord = {
+    ...run,
+    transcriptEntries,
+    artifactMetadata,
+    updatedAt: new Date().toISOString(),
+  }
+  runs[index] = updated
+  await writeAll(runs)
+  return updated
+}
