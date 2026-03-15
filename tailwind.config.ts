@@ -10,7 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        /* Relay brand - horizontal logo derived */
         relay: {
           bg: "#DFE8F1",
           "primary-dark": "#1B2E3B",
@@ -66,4 +65,5 @@ const config: Config = {
   },
   plugins: [],
 }
+
 export default config
