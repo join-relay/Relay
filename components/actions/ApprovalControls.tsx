@@ -1,6 +1,7 @@
 "use client"
 
 import { Check, X, Pencil } from "lucide-react"
+import type { ActionProvenance } from "@/types"
 
 interface ApprovalControlsProps {
   onApprove: () => void
@@ -8,7 +9,20 @@ interface ApprovalControlsProps {
   onEdit?: () => void
   isApproving?: boolean
   isRejecting?: boolean
-  source?: "mock" | "google"
+  approveDisabled?: boolean
+  provenance: ActionProvenance
+}
+
+function getApprovalNote(provenance: ActionProvenance) {
+  if (provenance.origin === "live" && provenance.provider === "gmail") {
+    return "Approving will execute against the linked Gmail thread."
+  }
+
+  if (provenance.origin === "live" && provenance.provider === "google_calendar") {
+    return "Approving will patch the linked Google Calendar event."
+  }
+
+  return "Approving records a demo fallback execution only. It will not touch Gmail or Calendar."
 }
 
 export function ApprovalControls({
@@ -17,20 +31,19 @@ export function ApprovalControls({
   onEdit,
   isApproving = false,
   isRejecting = false,
-  source = "mock",
+  approveDisabled = false,
+  provenance,
 }: ApprovalControlsProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
       <p className="w-full text-xs text-[#3F5363]">
-        {source === "google"
-          ? "Relay never executes without your review."
-          : "Relay never executes without your review in demo fallback mode."}
+        {getApprovalNote(provenance)}
       </p>
       <div className="flex flex-wrap gap-2">
         <button
           type="button"
           onClick={onApprove}
-          disabled={isApproving || isRejecting}
+          disabled={isApproving || isRejecting || approveDisabled}
           className="inline-flex items-center gap-2 rounded-relay-control bg-[#213443] px-4 py-2 text-sm font-medium text-white shadow-relay-soft transition-smooth hover:bg-[#1B2E3B] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isApproving ? (

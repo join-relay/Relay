@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ChevronDown, ChevronUp, Mail, Calendar, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DraftReview } from "./DraftReview"
@@ -12,9 +12,13 @@ interface ActionCardProps {
   onApprove: (id: string) => void
   onReject: (id: string) => void
   onEditContent: (id: string, content: DraftEmailPayload | RescheduleMeetingPayload) => void
+  onGenerateDraft?: (id: string) => void
+  onRegenerateDraft?: (id: string) => void
   isApproving?: boolean
   isRejecting?: boolean
-  source?: "mock" | "google"
+  isGeneratingDraft?: boolean
+  isFocused?: boolean
+  autoEnterEdit?: boolean
 }
 
 const urgencyStyles = {
@@ -34,12 +38,18 @@ export function ActionCard({
   onApprove,
   onReject,
   onEditContent,
+  onGenerateDraft,
+  onRegenerateDraft,
   isApproving = false,
   isRejecting = false,
-  source = "mock",
+  isGeneratingDraft = false,
+  isFocused = false,
+  autoEnterEdit = false,
 }: ActionCardProps) {
+  const cardRef = useRef<HTMLDivElement | null>(null)
   const [expanded, setExpanded] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
+  const [showFullOriginal, setShowFullOriginal] = useState(false)
 
   const handleApprove = () => onApprove(action.id)
   const handleReject = () => onReject(action.id)
@@ -50,13 +60,40 @@ export function ActionCard({
   }
 
   const isPending = action.status === "pending"
+  const emailDraftContent =
+    action.type === "draft_email"
+      ? ((action.reviewedContent ?? action.proposedAction) as DraftEmailPayload)
+      : null
+  const canApproveEmailDraft =
+    action.type !== "draft_email" || Boolean(emailDraftContent?.body?.trim())
   const TypeIcon = action.type === "draft_email" ? Mail : Calendar
+  const provenanceLabel =
+    action.provenance.origin === "live"
+      ? action.provenance.provider === "gmail"
+        ? "Live Gmail"
+        : "Live Calendar"
+      : "Demo fallback"
+
+  useEffect(() => {
+    if (!isFocused) return
+    setExpanded(true)
+    cardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [isFocused])
+
+  useEffect(() => {
+    if (!isFocused || !autoEnterEdit || action.type !== "draft_email" || action.status !== "pending") return
+    setIsEditing(true)
+  }, [action.status, action.type, autoEnterEdit, isFocused])
 
   return (
     <div
+      id={`action-${action.id}`}
+      data-testid={`action-card-${action.id}`}
+      ref={cardRef}
       className={cn(
         "rounded-relay-card border p-4 shadow-relay-soft transition-smooth",
-        urgencyStyles[action.urgency]
+        urgencyStyles[action.urgency],
+        isFocused && "ring-2 ring-[#213443]/15"
       )}
     >
       <button
@@ -103,6 +140,119 @@ export function ActionCard({
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span
+              className={cn(
+                "rounded-relay-control px-2 py-1 font-medium",
+                action.provenance.origin === "live"
+                  ? "bg-[#213443]/10 text-[#213443]"
+                  : "bg-[#e8edf3] text-[#314555]"
+              )}
+            >
+              {provenanceLabel}
+            </span>
+            {action.personalization && (
+              <span className="rounded-relay-control border border-[#213443]/15 bg-white/80 px-2 py-1 text-[#314555]">
+                {action.personalization.styleSource === "sent_mail"
+                  ? "Personalized reply"
+                  : "Saved preferences"}
+              </span>
+            )}
+            {action.personalization?.generation?.source === "deterministic_fallback" && (
+              <span className="rounded-relay-control border border-[var(--border)] bg-white/80 px-2 py-1 text-[#314555]">
+                Fallback draft
+              </span>
+            )}
+          </div>
+
+          {action.originalContext && (
+            <div className="rounded-relay-inner border border-[var(--border)] bg-white/70 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wider text-[#61707D]">
+                    Original {action.originalContext.kind === "gmail_thread" ? "thread" : "event"}
+                  </p>
+                  <p className="mt-1 text-sm text-[#314555]">{action.originalContext.preview}</p>
+                </div>
+                {action.originalContext.kind === "gmail_thread" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFullOriginal((current) => !current)}
+                    className="shrink-0 rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#1B2E3B] transition-smooth hover:bg-[#e8edf3]"
+                  >
+                    {showFullOriginal ? "Hide full thread" : "Show full thread"}
+                  </button>
+                )}
+              </div>
+
+              {action.originalContext.kind === "gmail_thread" ? (
+                <div className="mt-3 space-y-2">
+                  {showFullOriginal ? (
+                    action.originalContext.thread.messages.map((message) => (
+                      <div
+                        key={message.id}
+                        className="rounded-relay-control border border-[var(--border)] bg-white/80 p-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-[#1B2E3B]">{message.from}</p>
+                          <p className="text-xs text-[#61707D]">
+                            {new Date(message.date).toLocaleString()}
+                          </p>
+                        </div>
+                        {message.to && (
+                          <p className="mt-1 text-xs text-[#61707D]">To: {message.to}</p>
+                        )}
+                        <p className="mt-2 whitespace-pre-wrap text-sm text-[#314555]">
+                          {message.bodyPreview || message.snippet}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-relay-control border border-[var(--border)] bg-white/80 p-3">
+                      <p className="text-sm text-[#314555]">
+                        {action.originalContext.thread.messages.at(-1)?.bodyPreview ??
+                          action.originalContext.thread.preview}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-relay-control border border-[var(--border)] bg-white/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                      Current timing
+                    </p>
+                    <p className="mt-1 text-sm text-[#1B2E3B]">
+                      {new Date(action.originalContext.currentStart).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}{" "}
+                      to{" "}
+                      {new Date(action.originalContext.currentEnd).toLocaleTimeString("en-US", {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  <div className="rounded-relay-control border border-[var(--border)] bg-white/80 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                      Location
+                    </p>
+                    <p className="mt-1 text-sm text-[#1B2E3B]">
+                      {action.originalContext.location ?? "No location attached"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {action.personalization && (
+                <div className="mt-3 space-y-1 text-xs text-[#61707D]">
+                  <p>{action.personalization.summary}</p>
+                </div>
+              )}
+            </div>
+          )}
+
           {action.status === "approved" && action.executionSummary && (
             <div className="rounded-relay-inner border border-[#1B2E3B]/20 bg-white/80 p-3">
               <p className="text-sm font-medium text-[#1B2E3B] flex items-center gap-2">
@@ -127,8 +277,19 @@ export function ActionCard({
               <DraftReview
                 action={action}
                 onEdit={handleEditContent}
+                onGenerateDraft={
+                  action.type === "draft_email" && onGenerateDraft
+                    ? () => onGenerateDraft(action.id)
+                    : undefined
+                }
+                onRegenerateDraft={
+                  action.type === "draft_email" && onRegenerateDraft
+                    ? () => onRegenerateDraft(action.id)
+                    : undefined
+                }
                 onCancelEdit={() => setIsEditing(false)}
                 isEditing={isEditing}
+                isGenerating={isGeneratingDraft}
                 readOnly={false}
               />
               <ApprovalControls
@@ -137,7 +298,8 @@ export function ActionCard({
                 onEdit={action.type === "draft_email" ? handleEditClick : undefined}
                 isApproving={isApproving}
                 isRejecting={isRejecting}
-                source={source}
+                approveDisabled={!canApproveEmailDraft || isGeneratingDraft}
+                provenance={action.provenance}
               />
             </>
           )}

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { Mail, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -11,6 +12,7 @@ interface InboxSummaryProps {
 
 function ThreadRow({ thread }: { thread: GmailThread }) {
   const [expanded, setExpanded] = useState(false)
+  const actionHref = `/actions?focus=${encodeURIComponent(`gmail:${thread.id}`)}&compose=1`
   return (
     <div
       className={cn(
@@ -49,6 +51,14 @@ function ThreadRow({ thread }: { thread: GmailThread }) {
           )}
         </span>
       </button>
+      <div className="mt-2 pl-11">
+        <Link
+          href={actionHref}
+          className="inline-flex items-center rounded-relay-control border border-[var(--border)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#1B2E3B] transition-smooth hover:bg-[#e8edf3]"
+        >
+          Reply in Actions
+        </Link>
+      </div>
     </div>
   )
 }

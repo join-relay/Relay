@@ -11,13 +11,63 @@ import type {
   MeetingUpcomingStatus,
 } from "@/types"
 
-async function fetchMeetingReadinessStatus() {
-  const response = await fetch("/api/meeting/status")
-  if (!response.ok) {
-    throw new Error("Failed to load Google meeting readiness status")
-  }
+const STATUS_FETCH_TIMEOUT_MS = 8000
 
-  return response.json() as Promise<MeetingReadinessStatus>
+function buildClientErrorMeetingStatus(message: string): MeetingReadinessStatus {
+  return {
+    botIdentity: "Yassin's Relay",
+    resolutionState: "error",
+    overallState: "fallback",
+    assumptions: [
+      "Relay should resolve the Meeting page explicitly.",
+      "This client-side fallback is used when the status request does not settle normally.",
+    ],
+    manualSteps: [
+      "Reload the page to retry meeting readiness.",
+      "Reconnect Google in Settings if live data should be available.",
+    ],
+    runtimeEvidenceNote: "The Meeting page rendered an explicit error state instead of staying in a spinner.",
+    checkpoints: [],
+    nextMeeting: null,
+    customizationSummary: "Meeting customization could not be loaded for this request.",
+    summarySurface: { state: "empty", summary: null },
+    actionItemsSurface: { state: "empty", items: [] },
+    transcriptSurface: {
+      state: "empty",
+      previewLines: [],
+      note: "Meeting readiness failed before transcript data could load.",
+    },
+  }
+}
+
+async function fetchMeetingReadinessStatus() {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), STATUS_FETCH_TIMEOUT_MS)
+
+  try {
+    const response = await fetch("/api/meeting/status", {
+      cache: "no-store",
+      signal: controller.signal,
+      headers: {
+        "Cache-Control": "no-cache",
+      },
+    })
+    if (!response.ok) {
+      return buildClientErrorMeetingStatus("Failed to load Google meeting readiness status")
+    }
+
+    return (await response.json()) as MeetingReadinessStatus
+  } catch (error) {
+    return buildClientErrorMeetingStatus(
+      error instanceof Error && error.name === "AbortError"
+        ? `Meeting readiness timed out after ${STATUS_FETCH_TIMEOUT_MS}ms.`
+        : error instanceof Error
+          ? error.message
+          : "Failed to load Google meeting readiness status"
+    )
+  } finally {
+    window.clearTimeout(timeout)
+  }
 }
 
 async function fetchUpcomingStatus() {
@@ -49,12 +99,11 @@ export default function MeetingPage() {
   const {
     data: status,
     isLoading,
-    isError,
-    error,
   } = useQuery({
     queryKey: ["meeting-readiness"],
     queryFn: fetchMeetingReadinessStatus,
     refetchInterval: 5000,
+    retry: 0,
   })
   const { data: upcomingStatus } = useQuery({
     queryKey: ["meeting-upcoming-status"],
@@ -81,16 +130,12 @@ export default function MeetingPage() {
     )
   }
 
-  if (isError || !status) {
+  if (!status) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <div className="max-w-md rounded-relay-card border border-[#3F5363]/25 bg-white/80 p-5 text-center shadow-relay-soft">
           <p className="font-medium text-[#1B2E3B]">Something went wrong</p>
-          <p className="mt-1 text-sm text-[#3F5363]">
-            {error instanceof Error
-              ? error.message
-              : "Failed to load the Google meeting readiness view"}
-          </p>
+          <p className="mt-1 text-sm text-[#3F5363]">Failed to load the Google meeting readiness view</p>
         </div>
       </div>
     )
@@ -113,6 +158,31 @@ export default function MeetingPage() {
           validatedCount={validatedCount}
           botLabel={status.botIdentity}
         />
+      </div>
+
+      <div
+        data-testid="meeting-resolution-state"
+        className="rounded-relay-card border border-[var(--border)] bg-white/80 p-4 shadow-relay-soft"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wider text-[#61707D]">
+              Meeting resolution
+            </p>
+            <p className="mt-1 text-sm text-[#3F5363]">
+              {status.resolutionState === "live"
+                ? "Live Google readiness resolved successfully."
+                : status.resolutionState === "empty"
+                  ? "Live Google readiness resolved, but no current Google Meet was found."
+                  : status.resolutionState === "fallback"
+                    ? "Meeting readiness resolved to an explicit fallback state."
+                    : "Meeting readiness resolved to an explicit error state."}
+            </p>
+          </div>
+          <span className="rounded-relay-control border border-[var(--border)] bg-[#e8edf3] px-2 py-1 text-xs font-medium uppercase text-[#314555]">
+            {status.resolutionState}
+          </span>
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr,0.95fr] animate-relay-fade-in opacity-0 [animation-delay:75ms] [animation-fill-mode:forwards]">
@@ -191,6 +261,16 @@ export default function MeetingPage() {
 
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+              Future meeting writing
+            </h2>
+            <p className="mt-2 text-sm text-[#3F5363]">
+              {status.customizationSummary ??
+                "Meeting personalization is ready for future summaries and updates."}
+            </p>
+          </div>
+
+          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Upcoming Google Meet
             </h2>
             <div className="mt-3 space-y-3 text-sm text-[#3F5363]">
@@ -254,6 +334,56 @@ export default function MeetingPage() {
                 )}
               </div>
             )}
+          </div>
+
+          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+              Meeting summary
+            </h2>
+            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
+              {status.summarySurface.summary ??
+                "No meeting summary is available yet. This panel is ready for future Google Meet summary artifacts or manual fallback summaries."}
+            </div>
+          </div>
+
+          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+              Action items
+            </h2>
+            <div className="mt-3 space-y-2">
+              {status.actionItemsSurface.items.length > 0 ? (
+                status.actionItemsSurface.items.map((item) => (
+                  <div
+                    key={item}
+                    className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#314555]"
+                  >
+                    {item}
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
+                  No meeting action items are captured yet. Relay will only show them when a real
+                  summary path or artifact exists.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+              Transcript preview
+            </h2>
+            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
+              {status.transcriptSurface.previewLines.length > 0 ? (
+                <div className="space-y-2">
+                  {status.transcriptSurface.previewLines.map((line) => (
+                    <p key={line}>{line}</p>
+                  ))}
+                </div>
+              ) : (
+                <p>{status.transcriptSurface.note}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>

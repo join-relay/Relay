@@ -1,6 +1,7 @@
 import "server-only"
 
 import { getOptionalSession } from "@/auth"
+import { getRelayCustomizationSettings } from "@/lib/persistence/user-preferences"
 import { BOT_LABEL } from "@/lib/constants"
 import {
   getBaseGoogleIntegrationStatus,
@@ -19,6 +20,7 @@ import type {
 } from "@/types"
 
 let lastLinkCheck: MeetingLinkCheckAttempt | undefined
+const MEETING_LIVE_TIMEOUT_MS = 4500
 
 function deriveOverallState(checkpoints: MeetingIntegrationCheckpoint[]): IntegrationState {
   if (checkpoints.some((checkpoint) => checkpoint.state === "not_configured")) {
@@ -33,8 +35,89 @@ function deriveOverallState(checkpoints: MeetingIntegrationCheckpoint[]): Integr
   return "fallback"
 }
 
+function withTimeout<T>(promise: Promise<T>, label: string, timeoutMs = MEETING_LIVE_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms`)), timeoutMs)
+    }),
+  ])
+}
+
+export function buildMeetingReadinessErrorStatus(message: string): MeetingReadinessStatus {
+  return {
+    botIdentity: BOT_LABEL,
+    resolutionState: "error",
+    overallState: "fallback",
+    assumptions: [
+      "Relay is Google-first for Gmail, Calendar, and future Meet detection.",
+      "This page should resolve explicitly even when live dependencies fail.",
+    ],
+    manualSteps: [
+      "Reload the page to retry the readiness request.",
+      "If the issue persists, reconnect Google in Settings and check server logs.",
+    ],
+    runtimeEvidenceNote: "Meeting readiness could not be resolved from the current runtime request.",
+    checkpoints: [
+      {
+        key: "googleAuth",
+        label: "Google auth connected",
+        state: "fallback",
+        source: "runtime",
+        detail: message,
+      },
+      {
+        key: "gmailBriefing",
+        label: "Gmail read ready",
+        state: "fallback",
+        source: "runtime",
+        detail: "Meeting readiness did not reach live Gmail/calendar evaluation.",
+      },
+      {
+        key: "calendarRead",
+        label: "Calendar read ready",
+        state: "fallback",
+        source: "runtime",
+        detail: "Meeting readiness did not reach a usable calendar result.",
+      },
+      {
+        key: "meetDiscovery",
+        label: "Google Meet discovery",
+        state: "fallback",
+        source: "runtime",
+        detail: "No live or fallback meeting result could be confirmed from this request.",
+      },
+      {
+        key: "liveJoinPath",
+        label: "Real join proof",
+        state: "fallback",
+        source: "derived",
+        detail:
+          "Relay still does not claim a live join or spoken delivery without real proof.",
+      },
+    ],
+    nextMeeting: null,
+    lastLinkCheck,
+    customizationSummary: "Future meeting writing settings are unavailable for this failed request.",
+    summarySurface: {
+      state: "empty",
+      summary: null,
+    },
+    actionItemsSurface: {
+      state: "empty",
+      items: [],
+    },
+    transcriptSurface: {
+      state: "empty",
+      previewLines: [],
+      note: "Meeting readiness failed before transcript or summary surfaces could load.",
+    },
+  }
+}
+
 export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatus> {
   const session = await getOptionalSession()
+  const customization = await getRelayCustomizationSettings(session?.user?.email)
   const baseStatus = await getBaseGoogleIntegrationStatus({
     email: session?.user?.email,
     name: session?.user?.name,
@@ -49,7 +132,10 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
 
   if (baseStatus.canReadCalendar && session?.user?.email) {
     try {
-      const events = await getLiveCalendarEvents(session.user.email)
+      const events = await withTimeout(
+        getLiveCalendarEvents(session.user.email),
+        "Meeting calendar discovery"
+      )
       nextMeeting = getUpcomingGoogleMeet(events)
       calendarDetail = `Relay can read today's Google Calendar events${events.length > 0 ? ` (${events.length} found)` : ""}.`
       meetDetail = nextMeeting
@@ -113,9 +199,16 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
 
   const botIdentity =
     session?.user?.name ? `${session.user.name}'s Relay` : BOT_LABEL
+  const resolutionState = nextMeeting
+    ? "live"
+    : baseStatus.canReadCalendar && session?.user?.email
+      ? "empty"
+      : "fallback"
+  const hasUpcomingMeeting = Boolean(nextMeeting)
 
   return {
     botIdentity,
+    resolutionState,
     overallState: deriveOverallState(checkpoints),
     assumptions: [
       "Relay is Google-first for Gmail, Calendar, and future Meet detection.",
@@ -133,6 +226,25 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
     checkpoints,
     nextMeeting,
     lastLinkCheck,
+    customizationSummary: `Future meeting writing is set to ${customization.meetingUpdateStyle.replaceAll(
+      "_",
+      " "
+    )}, ${customization.meetingTone}, ${customization.meetingFormality}, and ${customization.meetingConciseness}.`,
+    summarySurface: {
+      state: hasUpcomingMeeting ? "pending" : "empty",
+      summary: null,
+    },
+    actionItemsSurface: {
+      state: hasUpcomingMeeting ? "pending" : "empty",
+      items: [],
+    },
+    transcriptSurface: {
+      state: hasUpcomingMeeting ? "pending" : "empty",
+      previewLines: [],
+      note: hasUpcomingMeeting
+        ? "No Google Meet summary or transcript artifacts are attached yet. Relay will only show them after a real artifact path exists."
+        : "No upcoming or recorded Google Meet artifact is available yet, so transcript preview stays empty.",
+    },
   }
 }
 
@@ -153,7 +265,10 @@ export async function getUpcomingMeetingStatus(): Promise<MeetingUpcomingStatus>
   }
 
   try {
-    const events = await getLiveCalendarEvents(session.user.email)
+    const events = await withTimeout(
+      getLiveCalendarEvents(session.user.email),
+      "Upcoming meeting discovery"
+    )
     const upcomingMeeting = getUpcomingGoogleMeet(events)
 
     if (!upcomingMeeting) {

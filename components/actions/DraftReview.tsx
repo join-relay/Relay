@@ -22,16 +22,22 @@ function formatTime(iso: string) {
 interface DraftReviewProps {
   action: PendingAction
   onEdit?: (content: DraftEmailPayload | RescheduleMeetingPayload) => void
+  onGenerateDraft?: () => void
+  onRegenerateDraft?: () => void
   onCancelEdit?: () => void
   isEditing?: boolean
+  isGenerating?: boolean
   readOnly?: boolean
 }
 
 export function DraftReview({
   action,
   onEdit,
+  onGenerateDraft,
+  onRegenerateDraft,
   onCancelEdit,
   isEditing = false,
+  isGenerating = false,
   readOnly = false,
 }: DraftReviewProps) {
   const content =
@@ -41,10 +47,14 @@ export function DraftReview({
     const payload = content as DraftEmailPayload
     return (
       <DraftEmailReview
+        action={action}
         payload={payload}
         onEdit={onEdit as (c: DraftEmailPayload) => void}
+        onGenerateDraft={onGenerateDraft}
+        onRegenerateDraft={onRegenerateDraft}
         onCancelEdit={onCancelEdit}
         isEditing={isEditing}
+        isGenerating={isGenerating}
         readOnly={readOnly}
       />
     )
@@ -66,16 +76,24 @@ export function DraftReview({
 }
 
 function DraftEmailReview({
+  action,
   payload,
   onEdit,
+  onGenerateDraft,
+  onRegenerateDraft,
   onCancelEdit,
   isEditing,
+  isGenerating,
   readOnly,
 }: {
+  action: PendingAction
   payload: DraftEmailPayload
   onEdit?: (c: DraftEmailPayload) => void
+  onGenerateDraft?: () => void
+  onRegenerateDraft?: () => void
   onCancelEdit?: () => void
   isEditing: boolean
+  isGenerating: boolean
   readOnly: boolean
 }) {
   const [subject, setSubject] = useState(payload.subject)
@@ -118,6 +136,38 @@ function DraftEmailReview({
         </span>
       </div>
       <div className="space-y-3">
+        {!payload.body.trim() && !showEditForm ? (
+          <div className="rounded-relay-control border border-dashed border-[var(--border)] bg-white/80 p-4">
+            <p className="text-sm text-[#3F5363]">Reply not generated yet.</p>
+            <button
+              type="button"
+              onClick={onGenerateDraft}
+              disabled={!onGenerateDraft || isGenerating}
+              className="mt-3 rounded-relay-control bg-[#213443] px-3 py-1.5 text-sm font-medium text-white transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGenerating ? "Generating..." : "Generate reply"}
+            </button>
+          </div>
+        ) : null}
+        {payload.body.trim() && !showEditForm ? (
+          <div className="flex items-center justify-between gap-3 rounded-relay-control border border-[var(--border)] bg-white/75 px-3 py-2">
+            <p className="text-xs text-[#61707D]">
+              {action.personalization?.generation?.cacheStatus === "cached"
+                ? "Saved draft loaded."
+                : action.personalization?.generation?.cacheStatus === "regenerated"
+                  ? "Reply regenerated."
+                  : "Reply generated and saved."}
+            </p>
+            <button
+              type="button"
+              onClick={onRegenerateDraft}
+              disabled={!onRegenerateDraft || isGenerating}
+              className="rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#1B2E3B] transition-smooth hover:bg-[#e8edf3] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGenerating ? "Generating..." : "Regenerate"}
+            </button>
+          </div>
+        ) : null}
         <div>
           <p className="text-xs text-[#3F5363] mb-0.5">To: {payload.to}</p>
           {showEditForm && !readOnly ? (
@@ -159,7 +209,12 @@ function DraftEmailReview({
             </div>
           </div>
         ) : (
-          <p className="text-sm text-[#314555] whitespace-pre-wrap">{body}</p>
+          <p
+            data-testid="draft-email-body"
+            className="text-sm text-[#314555] whitespace-pre-wrap"
+          >
+            {body}
+          </p>
         )}
       </div>
       {!showEditForm && !readOnly && onEdit && (

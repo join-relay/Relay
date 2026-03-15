@@ -7,21 +7,27 @@ import {
 } from "@/lib/services/calendar"
 import { getLiveGmailThreads } from "@/lib/services/gmail"
 import { getBaseGoogleIntegrationStatus } from "@/lib/services/google-auth"
+import { enhanceBriefingPriorities } from "@/lib/services/openai-reasoning"
 import type { Briefing } from "@/types"
 
 function buildPriorities(briefing: Pick<Briefing, "inboxSummary" | "calendarSummary">) {
   const priorities = []
 
-  const urgentThread = briefing.inboxSummary.threads.find((thread) => thread.isUnread)
-  if (urgentThread) {
+  const replyCandidates = briefing.inboxSummary.threads
+    .filter((thread) => thread.isUnread || /(urgent|asap|deadline|approve|approval|question|\?)/i.test(`${thread.subject} ${thread.snippet}`))
+    .slice(0, 2)
+
+  for (const thread of replyCandidates) {
     priorities.push({
-      id: `email-${urgentThread.id}`,
+      id: `email-${thread.id}`,
       type: "email" as const,
-      title: urgentThread.subject,
-      description: `Unread email from ${urgentThread.from}`,
-      priority: "urgent" as const,
-      metadata: { threadId: urgentThread.id },
-      whySurfaced: "Unread Gmail thread surfaced from the live inbox read.",
+      title: thread.subject,
+      description: `${thread.isUnread ? "Unread" : "Recent"} email from ${thread.from}`,
+      priority: thread.isUnread ? ("urgent" as const) : ("important" as const),
+      metadata: { threadId: thread.id },
+      whySurfaced: thread.isUnread
+        ? "Unread Gmail thread surfaced from the live inbox read."
+        : "Recent Gmail thread looks reply-worthy from the live inbox read.",
     })
   }
 
@@ -105,7 +111,14 @@ export async function getBriefing(): Promise<Briefing> {
       priorities: [],
     }
 
-    briefing.priorities = buildPriorities(briefing)
+    const deterministicPriorities = buildPriorities(briefing)
+    briefing.priorities =
+      (await enhanceBriefingPriorities({
+        displayName: briefing.displayName,
+        candidates: deterministicPriorities,
+        threads,
+        upcomingMeeting: upcomingMeeting ?? undefined,
+      })) ?? deterministicPriorities
     return briefing
   } catch (error) {
     return {

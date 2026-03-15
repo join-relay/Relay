@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { useState } from "react"
 import { ChevronDown, ChevronUp, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -25,6 +26,8 @@ function PriorityItemRow({ item }: { item: PriorityItem }) {
   const [showWhy, setShowWhy] = useState(false)
   const style = priorityStyles[item.priority]
   const labelStyle = priorityLabelStyles[item.priority]
+  const threadId =
+    item.type === "email" && typeof item.metadata?.threadId === "string" ? item.metadata.threadId : null
 
   return (
     <div
@@ -55,6 +58,16 @@ function PriorityItemRow({ item }: { item: PriorityItem }) {
           <p className="mt-2 rounded-relay-control bg-white/60 p-2 text-xs text-[#3F5363] border border-[var(--border)]">
             {item.whySurfaced}
           </p>
+        )}
+        {threadId && (
+          <div className="mt-2.5">
+            <Link
+              href={`/actions?focus=${encodeURIComponent(`gmail:${threadId}`)}&compose=1`}
+              className="inline-flex items-center rounded-relay-control border border-[var(--border)] bg-white/80 px-3 py-1.5 text-xs font-medium text-[#1B2E3B] transition-smooth hover:bg-[#e8edf3]"
+            >
+              Open reply in Actions
+            </Link>
+          </div>
         )}
       </div>
     </div>

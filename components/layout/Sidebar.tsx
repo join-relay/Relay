@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { useEffect } from "react"
+import { usePathname, useRouter } from "next/navigation"
 import { LayoutDashboard, Mail, Video, History, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { SidebarBranding } from "./SidebarBranding"
@@ -16,9 +17,16 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    navItems.forEach((item) => {
+      router.prefetch(item.href)
+    })
+  }, [router])
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#61707D]/20 bg-white/95 backdrop-blur-sm">
+    <aside className="fixed left-0 top-0 z-50 h-screen w-60 border-r border-[#61707D]/20 bg-white/95 backdrop-blur-sm">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-center px-4 pt-6 pb-5">
           <SidebarBranding />
@@ -31,6 +39,10 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch
+                onMouseEnter={() => router.prefetch(item.href)}
+                onFocus={() => router.prefetch(item.href)}
+                data-testid={`sidebar-${item.label.toLowerCase()}`}
                 className={cn(
                   "flex items-center gap-3 rounded-relay-control px-3 py-2 text-sm font-medium transition-smooth",
                   isActive

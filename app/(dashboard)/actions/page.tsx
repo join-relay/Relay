@@ -1,26 +1,21 @@
 "use client"
 
+import { useSearchParams } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { ActionsPageHeader } from "@/components/actions/ActionsPageHeader"
 import { ActionCard } from "@/components/actions/ActionCard"
+import {
+  ACTIONS_QUERY_KEY,
+  LIVE_REFRESH_INTERVAL_MS,
+  fetchActions,
+} from "@/lib/client/dashboard-queries"
+import { useLiveRefetch } from "@/lib/client/use-live-refetch"
 import type {
   ActionsViewState,
   PendingAction,
   DraftEmailPayload,
   RescheduleMeetingPayload,
 } from "@/types"
-
-interface ActionsResponse {
-  actions: PendingAction[]
-  displayName: string | null
-  viewState: ActionsViewState
-}
-
-async function fetchActions(): Promise<ActionsResponse> {
-  const res = await fetch("/api/actions")
-  if (!res.ok) throw new Error("Failed to load actions")
-  return res.json() as Promise<ActionsResponse>
-}
 
 async function approveAction(id: string) {
   const res = await fetch(`/api/actions/${id}/approve`, {
@@ -59,13 +54,35 @@ async function editAction(id: string, content: DraftEmailPayload | RescheduleMee
   return res.json() as Promise<PendingAction>
 }
 
-export default function ActionsPage() {
-  const queryClient = useQueryClient()
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["actions"],
-    queryFn: fetchActions,
+async function generateDraft(id: string, force = false) {
+  const res = await fetch(`/api/actions/${id}/draft`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ force }),
   })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error ?? "Failed to generate draft")
+  }
+  return res.json() as Promise<PendingAction>
+}
+
+export default function ActionsPage() {
+  const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ACTIONS_QUERY_KEY,
+    queryFn: fetchActions,
+    staleTime: 10000,
+    refetchInterval: LIVE_REFRESH_INTERVAL_MS,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+  })
+  useLiveRefetch(refetch)
   const actions = data?.actions ?? []
+  const focusedActionId = searchParams.get("focus")
+  const autoEnterEdit = searchParams.get("compose") === "1"
   const viewState = data?.viewState ?? {
     source: "mock" as const,
     statusNote: "Relay is showing explicit demo fallback actions.",
@@ -73,21 +90,49 @@ export default function ActionsPage() {
 
   const approveMutation = useMutation({
     mutationFn: approveAction,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["actions"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY }),
   })
   const rejectMutation = useMutation({
     mutationFn: rejectAction,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["actions"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY }),
   })
   const editMutation = useMutation({
     mutationFn: ({ id, content }: { id: string; content: DraftEmailPayload | RescheduleMeetingPayload }) =>
       editAction(id, content),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["actions"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY }),
+  })
+  const generateDraftMutation = useMutation({
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) => generateDraft(id, force),
+    onSuccess: (updatedAction) => {
+      queryClient.setQueryData(
+        ACTIONS_QUERY_KEY,
+        (current: {
+          actions: PendingAction[]
+          displayName: string | null
+          viewState: ActionsViewState
+        } | undefined) =>
+          current
+            ? {
+                ...current,
+                actions: current.actions.map((action) =>
+                  action.id === updatedAction.id ? updatedAction : action
+                ),
+              }
+            : current
+      )
+    },
   })
 
   const pendingActions = actions.filter((a) => a.status === "pending")
   const urgentCount = pendingActions.filter((a) => a.urgency === "urgent").length
   const conflictCount = pendingActions.filter((a) => a.type === "reschedule_meeting").length
+  const orderedActions = focusedActionId
+    ? [...actions].sort((left, right) => {
+        if (left.id === focusedActionId) return -1
+        if (right.id === focusedActionId) return 1
+        return 0
+      })
+    : actions
 
   if (isLoading) {
     return (
@@ -130,16 +175,22 @@ export default function ActionsPage() {
             <p className="text-[#3F5363]">No actions to review</p>
           </div>
         ) : (
-          actions.map((action) => (
+          orderedActions.map((action) => (
             <ActionCard
               key={action.id}
               action={action}
               onApprove={(id) => approveMutation.mutate(id)}
               onReject={(id) => rejectMutation.mutate(id)}
               onEditContent={(id, content) => editMutation.mutate({ id, content })}
+              onGenerateDraft={(id) => generateDraftMutation.mutate({ id })}
+              onRegenerateDraft={(id) => generateDraftMutation.mutate({ id, force: true })}
               isApproving={approveMutation.isPending && approveMutation.variables === action.id}
               isRejecting={rejectMutation.isPending && rejectMutation.variables === action.id}
-              source={viewState.source}
+              isGeneratingDraft={
+                generateDraftMutation.isPending && generateDraftMutation.variables?.id === action.id
+              }
+              isFocused={focusedActionId === action.id}
+              autoEnterEdit={focusedActionId === action.id && autoEnterEdit}
             />
           ))
         )}

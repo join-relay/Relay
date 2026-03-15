@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { google } from "googleapis"
 import type { GoogleIntegrationStatus } from "@/types"
+import { getDevLiveDataState } from "@/lib/persistence/dev-test-state"
 import { decryptSecret, encryptSecret, isEncryptionConfigured } from "@/lib/security/encryption"
 
 export const GOOGLE_GMAIL_READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
@@ -25,6 +26,10 @@ export const GOOGLE_BASE_SCOPES = [
   GOOGLE_CALENDAR_WRITE_SCOPE,
   GOOGLE_DRIVE_FILE_SCOPE,
 ] as const
+
+function isDevAuthBypassEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.RELAY_DEV_AUTH_BYPASS === "1"
+}
 
 type GoogleTokenRecord = {
   subject: string
@@ -274,6 +279,25 @@ export async function getBaseGoogleIntegrationStatus(params: {
   name?: string | null
   hasSession: boolean
 }): Promise<GoogleIntegrationStatus> {
+  const devLiveData = isDevAuthBypassEnabled() ? await getDevLiveDataState() : null
+  if (params.hasSession && devLiveData?.enabled) {
+    return {
+      status: "validated",
+      displayName: devLiveData.displayName ?? params.name ?? undefined,
+      email: normalizeEmail(params.email),
+      scopes: [GOOGLE_GMAIL_READ_SCOPE, GOOGLE_GMAIL_SEND_SCOPE, GOOGLE_CALENDAR_READ_SCOPE],
+      missingEnv: [],
+      hasSession: true,
+      hasRefreshToken: true,
+      encryptionReady: true,
+      canReadGmail: true,
+      canReadCalendar: true,
+      canUseLiveBriefing: true,
+      nextMeetEvent: null,
+      note: "Dev test live-data mode is active for deterministic Gmail and Calendar coverage.",
+    }
+  }
+
   const env = getRequiredGoogleEnv()
   const encryptionReady = isEncryptionConfigured()
   const record = await getGoogleAccountRecord(params.email)

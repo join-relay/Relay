@@ -2,11 +2,16 @@ import "server-only"
 
 import { google } from "googleapis"
 import type { CalendarEvent } from "@/types"
+import { getDevLiveDataState } from "@/lib/persistence/dev-test-state"
 import {
   clearGoogleAccountConnection,
   getGoogleAccessToken,
   getGoogleOAuthClient,
 } from "@/lib/services/google-auth"
+
+function isDevAuthBypassEnabled() {
+  return process.env.NODE_ENV !== "production" && process.env.RELAY_DEV_AUTH_BYPASS === "1"
+}
 
 function getDateWindow() {
   const start = new Date()
@@ -107,6 +112,11 @@ function isInsufficientScopesError(err: unknown): boolean {
 }
 
 export async function getLiveCalendarEvents(email?: string | null, limit = 25): Promise<CalendarEvent[]> {
+  const devLiveData = isDevAuthBypassEnabled() ? await getDevLiveDataState() : null
+  if (devLiveData?.enabled) {
+    return (devLiveData.calendarEvents ?? []).slice(0, limit)
+  }
+
   const accessToken = await getGoogleAccessToken(email)
   if (!accessToken) {
     throw new Error("No Google access token is available for Calendar")

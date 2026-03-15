@@ -29,7 +29,7 @@
 --   created_at TIMESTAMPTZ DEFAULT NOW()
 -- );
 
--- Action executions (audit/trust layer). G2: provider, external IDs, failure detail.
+-- Action executions / audit events (audit/trust layer). G2/G3: provider, external IDs, failure detail, rejected review outcomes.
 -- CREATE TABLE action_executions (
 --   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 --   pending_action_id UUID REFERENCES pending_actions(id),
@@ -39,7 +39,7 @@
 --   title TEXT,
 --   proposed_payload JSONB NOT NULL,
 --   executed_at TIMESTAMPTZ NOT NULL,
---   execution_status TEXT CHECK (execution_status IN ('success', 'failed')),
+--   execution_status TEXT CHECK (execution_status IN ('success', 'failed', 'rejected')),
 --   error_message TEXT,
 --   user_email TEXT,
 --   source TEXT CHECK (source IN ('live', 'mock')),
