@@ -187,7 +187,9 @@ test("loads briefing and navigates to actions on first click", async ({ page }) 
   await expect(page.getByTestId("action-card-a1")).toBeVisible()
 })
 
-test("rejected actions persist across navigation and refresh", async ({ page }) => {
+test("rejected action disappears from Actions list and stays gone after navigation and refresh", async ({
+  page,
+}) => {
   await resetAndLogin(page)
 
   await page.getByTestId("sidebar-actions").click()
@@ -196,17 +198,16 @@ test("rejected actions persist across navigation and refresh", async ({ page }) 
   const actionCard = page.getByTestId("action-card-a1")
   await expect(actionCard).toBeVisible()
   await actionCard.getByRole("button", { name: "Reject" }).click()
-  await expect(actionCard.getByText("rejected")).toBeVisible()
-  await expect(actionCard.getByText("This action was declined.")).toBeVisible()
+  await expect(actionCard).not.toBeVisible({ timeout: 5000 })
 
   await page.getByTestId("sidebar-briefing").click()
   await expect(page).toHaveURL(/\/briefing$/)
   await page.getByTestId("sidebar-actions").click()
   await expect(page).toHaveURL(/\/actions$/)
-  await expect(page.getByTestId("action-card-a1").getByText("rejected")).toBeVisible()
+  await expect(page.getByTestId("action-card-a1")).not.toBeVisible()
 
   await page.reload()
-  await expect(page.getByTestId("action-card-a1").getByText("rejected")).toBeVisible()
+  await expect(page.getByTestId("action-card-a1")).not.toBeVisible()
 })
 
 test("opens settings and logs out in dev test mode", async ({ page }) => {
@@ -231,6 +232,52 @@ test("meeting page resolves to an explicit state without indefinite loading", as
   await page.goto("/meeting")
   await expect(page.getByTestId("meeting-resolution-state")).toContainText("empty")
   await expect(page.getByText("Loading Google meeting readiness...")).not.toBeVisible()
+})
+
+test("Recall readiness is reported on Meeting page and matches status route", async ({ page }) => {
+  await resetAndLogin(page)
+  await page.goto("/meeting")
+  await expect(page.getByText("Recall.ai provider foundation")).toBeVisible({ timeout: 10000 })
+  const statusRes = await page.request.get("/api/meeting/status")
+  expect(statusRes.ok()).toBeTruthy()
+  const status = await statusRes.json()
+  expect(status.providerReadiness).toBeDefined()
+  expect(status.providerReadiness.provider).toBe("recall_ai")
+  expect(["configured", "not_configured"]).toContain(status.providerReadiness.configState)
+  await expect(
+    page.getByText(status.providerReadiness.configState, { exact: false })
+  ).toBeVisible()
+})
+
+test("approve removes action from list promptly", async ({ page }) => {
+  await resetAndLogin(page)
+  await page.goto("/actions")
+  const actionCard = page.getByTestId("action-card-a1")
+  await expect(actionCard).toBeVisible()
+  await actionCard.getByRole("button", { name: /Approve & execute/i }).click()
+  await expect(actionCard).not.toBeVisible({ timeout: 8000 })
+})
+
+test("sidebar navigation works on first click", async ({ page }) => {
+  await resetAndLogin(page)
+  await expect(page).toHaveURL(/\/briefing$/)
+  await page.getByTestId("sidebar-actions").click()
+  await expect(page).toHaveURL(/\/actions$/)
+  await page.getByTestId("sidebar-meeting").click()
+  await expect(page).toHaveURL(/\/meeting$/)
+  await page.getByTestId("sidebar-briefing").click()
+  await expect(page).toHaveURL(/\/briefing$/)
+})
+
+test("dev provider-readiness route returns presence only when not in production", async ({ page }) => {
+  const res = await page.request.get("/api/dev/provider-readiness")
+  expect(res.ok()).toBeTruthy()
+  const body = await res.json()
+  expect(body.recall).toBeDefined()
+  expect(typeof body.recall.RECALL_API_KEY).toBe("boolean")
+  expect(typeof body.recall.RECALL_API_BASE_URL).toBe("boolean")
+  expect(typeof body.recall.RECALL_WEBHOOK_SECRET).toBe("boolean")
+  expect(body.note).toBeDefined()
 })
 
 test("generated replies keep sender and recipient identity correct", async ({ page }) => {
