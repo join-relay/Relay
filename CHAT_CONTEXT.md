@@ -75,8 +75,8 @@ gsuite-wellbeing-analyzer/
 ## Auth and env
 
 - **One provider at a time:** Last sign-in wins. Tokens stored as `{ provider: "google" | "microsoft", google?: {...}, microsoft?: {...} }`.
-- **Google:** Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (default `https://relay-7ijr6cgv6-yassins-projects-11732a5e.vercel.app/api/auth/callback`). Create OAuth client in GCP with that redirect.
-- **Microsoft:** Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI` (default `https://relay-7ijr6cgv6-yassins-projects-11732a5e.vercel.app/api/auth/callback/microsoft`). App registration in Azure/Entra with redirect and API permissions: Mail.Read, Calendars.Read, User.Read, offline_access (Delegated). Supported account types: “Accounts in any organizational directory and personal Microsoft accounts” so school + personal can sign in.
+- **Google:** Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (default `https://relay-phi-green.vercel.app/api/auth/callback`). Create OAuth client in GCP with that redirect.
+- **Microsoft:** Set `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, `MICROSOFT_REDIRECT_URI` (default `https://relay-phi-green.vercel.app/api/auth/callback/microsoft`). App registration in Azure/Entra with redirect and API permissions: Mail.Read, Calendars.Read, User.Read, offline_access (Delegated). Supported account types: “Accounts in any organizational directory and personal Microsoft accounts” so school + personal can sign in.
 
 **Microsoft + student/school accounts:** If the user gets 401 or “can’t create applications outside of a directory,” they should use a **personal Microsoft account** to create the app registration (e.g. via M365 Developer Program or Azure signup). The app can still accept **school account sign-in** on the deployed app as long as the app is registered with “Accounts in any org and personal.”
 
@@ -92,7 +92,7 @@ gsuite-wellbeing-analyzer/
 ## How to run and test
 
 1. Copy `.env.local.example` to `.env.local` and fill in at least one provider (Google or Microsoft).
-2. `npm install` then `npm run dev`. Open https://relay-7ijr6cgv6-yassins-projects-11732a5e.vercel.app (or http://localhost:3000 for local dev).
+2. `npm install` then `npm run dev`. Open https://relay-phi-green.vercel.app (or http://localhost:3000 for local dev).
 3. Click “Sign in with Microsoft (Outlook)” or “Sign in with Google (G Suite)” → complete OAuth → land on dashboard.
 4. Click “Sync now” / “Refresh sync” to pull calendar and email (and for Google: Meet, Docs).
 5. Use “Wellbeing check-in” to log energy/overwhelm/note; it appears in ProfileOverview and Latest wellbeing.

@@ -347,7 +347,7 @@ Update [project.sql](project.sql) as the single schema reference. Do not add new
 - Create one Google Cloud project for Relay.
 - Enable Gmail API, Google Calendar API, Google Drive API, Google Picker API, and Google Meet REST API.
 - Configure the OAuth consent screen with the exact incremental scopes above.
-- Create a Web OAuth client with https://relay-7ijr6cgv6-yassins-projects-11732a5e.vercel.app (and localhost for local dev) callback URLs.
+- Create a Web OAuth client with https://relay-phi-green.vercel.app (and localhost for local dev) callback URLs.
 - Restrict the Google Picker API key to allowed referrers.
 - Verify offline access and refresh-token issuance for the Relay demo account.
 - Prepare one real Google account or Workspace account with believable Gmail threads, Calendar events, Drive docs, and one real Google Meet event.
