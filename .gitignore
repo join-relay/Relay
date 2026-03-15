@@ -1,3 +1,9 @@
+node_modules
+.next
+.env
+.env.local
+.relay
+*.log
 # Dependencies
 node_modules/
 
