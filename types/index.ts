@@ -343,6 +343,9 @@ export interface MeetingReadinessStatus {
   nextMeeting?: CalendarEvent | null
   lastLinkCheck?: MeetingLinkCheckAttempt
   customizationSummary?: string
+  providerReadiness?: RecallProviderReadiness
+  /** Most recent Recall meeting run, when present (provider-confirmed bot/transcript). */
+  activeRecallRun?: MeetingRunRecord | null
   summarySurface: {
     state: "empty" | "pending" | "available"
     summary: string | null
@@ -372,6 +375,127 @@ export interface GoogleIntegrationStatus {
   canUseLiveBriefing: boolean
   nextMeetEvent?: CalendarEvent | null
   note: string
+}
+
+export type RecallConfigState = "configured" | "not_configured"
+export type RecallScaffoldingState = "ready" | "not_ready"
+export type RecallLiveBotState = "untested" | "validated"
+export type RecallArtifactSource =
+  | "recall_transcript"
+  | "recall_recording"
+  | "manual"
+  | "none"
+
+export interface RecallProviderReadiness {
+  provider: "recall_ai"
+  configState: RecallConfigState
+  botCreationScaffoldingState: RecallScaffoldingState
+  liveBotState: RecallLiveBotState
+  missingEnv: string[]
+  apiBaseUrl: string
+  webhookConfigured: boolean
+  note: string
+}
+
+export interface RecallBotCreateRequest {
+  meetingUrl: string
+  botName: string
+  deduplicationKey?: string
+  metadata?: Record<string, string>
+}
+
+export interface RecallBotCreateResponse {
+  id: string
+  status: string
+  meetingUrl?: string
+  joinUrl?: string
+  raw?: Record<string, unknown>
+}
+
+export interface RecallTranscriptEntry {
+  speaker?: string
+  text: string
+  startedAt?: string
+  endedAt?: string
+}
+
+export interface RecallArtifactMetadata {
+  transcriptSource: RecallArtifactSource
+  recordingSource: RecallArtifactSource
+  transcriptEntries: number
+  recordingUrl?: string
+  transcriptUrl?: string
+}
+
+export interface MeetingRunRecord {
+  id: string
+  provider: "recall_ai"
+  meetingUrl: string
+  botId?: string
+  status: "scaffolded" | "created" | "joining" | "running" | "completed" | "failed"
+  /** Provider-reported status (e.g. joining_call, in_call_recording, done, fatal). */
+  providerStatus?: string
+  /** Error or sub_code from provider when status is failed/fatal. */
+  providerError?: string
+  createdAt: string
+  updatedAt: string
+  artifactMetadata?: RecallArtifactMetadata
+  /** Stored transcript utterances from webhook events. */
+  transcriptEntries?: RecallTranscriptEntry[]
+}
+
+/**
+ * Relay — Digital Double
+ * Shared types for the you-model and agent engine.
+ */
+export interface StaticIdentity {
+  communicationStyle: string
+  decisionOwnership: string
+  hardLimits: string[]
+  riskTolerance: string
+}
+
+export interface DynamicContext {
+  currentProjects: string[]
+  recentDecisions: string[]
+  calendarPressure: string
+}
+
+export interface MeetingSpecificInstructions {
+  goals: string[]
+  pushBackOn: string[]
+  thresholds: string[]
+  notes?: string
+}
+
+export interface YouModel {
+  userName: string
+  staticIdentity: StaticIdentity
+  dynamicContext: Partial<DynamicContext>
+  meetingSpecific?: MeetingSpecificInstructions
+}
+
+export interface MeetingContext {
+  meetingId: string
+  transcriptChunk: string
+  recentRelayMessages?: string[]
+}
+
+export interface JudgmentResult {
+  shouldSpeak: boolean
+  reason: string
+}
+
+export interface ConfidenceScore {
+  score: number
+  reasoning: string
+}
+
+export interface AgentDecision {
+  spoke: boolean
+  response?: string
+  confidence?: ConfidenceScore
+  judgmentReason: string
 }
 
 export interface MeetingHistoryEntry {
