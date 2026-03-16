@@ -13,12 +13,13 @@ function isDevAuthBypassEnabled() {
   return process.env.NODE_ENV !== "production" && process.env.RELAY_DEV_AUTH_BYPASS === "1"
 }
 
-function getDateWindow() {
+/** Returns a time window for calendar fetches. Default 2 days so "today" and "tomorrow" events both show (e.g. after adding from Actions). */
+function getDateWindow(days = 2) {
   const start = new Date()
   start.setHours(0, 0, 0, 0)
 
   const end = new Date(start)
-  end.setDate(end.getDate() + 1)
+  end.setDate(end.getDate() + days)
 
   return {
     timeMin: start.toISOString(),

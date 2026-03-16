@@ -2,6 +2,7 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 import type { ProposedCalendarEvent } from "@/types"
+import { getTimezoneOffsetHint } from "@/lib/utils/timezone"
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 const MODEL = process.env.OPENAI_MEETING_SUMMARY_MODEL?.trim() || "gpt-4o-mini"
@@ -30,6 +31,8 @@ export async function extractProposedMeetingFromEmail(
     process.env.CALENDAR_DEFAULT_TIMEZONE?.trim() ||
     "America/Edmonton"
 
+  const tzHint = getTimezoneOffsetHint(userTimezone)
+
   try {
     const res = await fetch(OPENAI_CHAT_URL, {
       method: "POST",
@@ -43,7 +46,7 @@ export async function extractProposedMeetingFromEmail(
           {
             role: "system",
             content: `You extract a single proposed meeting or call from an email.
-User timezone: ${userTimezone}. CRITICAL: Interpret times in the user's timezone then convert to UTC. "8 AM" = 08:00 local → UTC (e.g. 8 AM ${userTimezone} = 14:00 or 15:00 UTC). "8 PM" = 20:00 local → UTC. Do NOT use 08:00 UTC for "8 AM" (that displays as 2 AM in North America). Do NOT use 14:00 for "8 PM".
+${tzHint} CRITICAL: "8 AM" = 08:00 local → convert to UTC using the current offset (e.g. GMT-6 → 8 AM = 14:00 UTC). "8 PM" = 20:00 local → 02:00 UTC next day when GMT-6. Never use 08:00 UTC for "8 AM".
 Today's date (for "tomorrow" etc.): ${new Date().toISOString().slice(0, 10)}.
 Output start and end in ISO 8601 with Z (UTC). Default duration 1 hour if not specified.
 Output a JSON object only, no markdown: { "title": string, "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string }.

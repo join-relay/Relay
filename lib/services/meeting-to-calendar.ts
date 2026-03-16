@@ -2,6 +2,7 @@ import "server-only"
 
 import { randomUUID } from "node:crypto"
 import type { ProposedCalendarEvent, RecallTranscriptEntry } from "@/types"
+import { getTimezoneOffsetHint } from "@/lib/utils/timezone"
 
 const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 const MODEL = process.env.OPENAI_MEETING_SUMMARY_MODEL?.trim() || "gpt-4o-mini"
@@ -64,7 +65,7 @@ export async function extractProposedMeetings(
             role: "system",
             content: `You extract follow-up or new meetings agreed in a meeting transcript.
 Reference meeting: start ${refStart}, end ${refEnd} (ISO).
-User timezone: ${USER_TIMEZONE}. CRITICAL: Interpret ALL times (e.g. "8 AM tomorrow", "meet at 8") as that time in the user's timezone, then convert to UTC for start/end. "8 AM tomorrow" = 08:00 local tomorrow = one day after reference date at 08:00 in ${USER_TIMEZONE} → output that moment in ISO with Z. Do NOT output 08:00 UTC for "8 AM" (that would show as 2 AM in Edmonton).
+${getTimezoneOffsetHint(USER_TIMEZONE)} CRITICAL: "8 AM tomorrow" means 08:00 local time on the next calendar day in the user's timezone — convert that to UTC for start/end (e.g. if offset is GMT-6 then 8 AM local = 14:00 UTC). Never use 08:00 UTC for "8 AM" (that would display as 1–2 AM for the user).
 For relative times like "same time next week" use the reference (same weekday and time next week).
 Output a JSON array of objects only, no markdown. Each object: { "title": string, "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string }.
 If there are no clear follow-up meetings, output [].`,
