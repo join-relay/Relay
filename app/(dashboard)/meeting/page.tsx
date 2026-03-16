@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { AlertCircle, Calendar, Radio } from "lucide-react"
-import { IntegrationCheckpointCard } from "@/components/meeting/IntegrationCheckpointCard"
 import { JoinValidationPanel } from "@/components/meeting/JoinValidationPanel"
 import { MeetingPageHeader } from "@/components/meeting/MeetingPageHeader"
 import type {
@@ -185,114 +184,22 @@ export default function MeetingPage() {
         />
       </div>
 
-      <div
-        data-testid="meeting-resolution-state"
-        className="rounded-relay-card border border-[var(--border)] bg-white/80 p-4 shadow-relay-soft"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-[#61707D]">
-              Meeting resolution
-            </p>
-            <p className="mt-1 text-sm text-[#3F5363]">
-              {status.resolutionState === "live"
-                ? "Live Google readiness resolved successfully."
-                : status.resolutionState === "empty"
-                  ? "Live Google readiness resolved, but no current Google Meet was found."
-                  : status.resolutionState === "fallback"
-                    ? "Meeting readiness resolved to an explicit fallback state."
-                    : "Meeting readiness resolved to an explicit error state."}
-            </p>
-          </div>
-          <span className="rounded-relay-control border border-[var(--border)] bg-[#e8edf3] px-2 py-1 text-xs font-medium uppercase text-[#314555]">
-            {status.resolutionState}
-          </span>
-        </div>
-      </div>
-
       <div className="grid gap-6 lg:grid-cols-[1.35fr,0.95fr] animate-relay-fade-in opacity-0 [animation-delay:75ms] [animation-fill-mode:forwards]">
         <div className="space-y-4">
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-                  Google meeting readiness
-                </h2>
-                <p className="mt-2 text-sm text-[#3F5363]">
-                  Relay is preparing the honest Google Meet path for {status.botIdentity}.
-                  Live Google auth and Calendar discovery appear separately from
-                  explicit fallback states.
-                </p>
-              </div>
-              <span className="rounded-relay-control border border-[var(--border)] bg-[#e8edf3] px-2 py-1 text-xs font-medium capitalize text-[#314555]">
-                {status.overallState.replaceAll("_", " ")}
-              </span>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              {status.checkpoints.map((checkpoint) => (
-                <IntegrationCheckpointCard
-                  key={checkpoint.key}
-                  checkpoint={checkpoint}
-                />
-              ))}
-            </div>
-          </div>
-
-          {status.providerReadiness && (
+          {status.providerReadiness && status.providerReadiness.configState === "configured" && (
             <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-                    Recall.ai provider foundation
-                  </h2>
-                  <p className="mt-2 text-sm text-[#3F5363]">
-                    {status.providerReadiness.note}
-                  </p>
-                </div>
-                <span className="rounded-relay-control border border-[var(--border)] bg-[#e8edf3] px-2 py-1 text-xs font-medium uppercase text-[#314555]">
-                  {status.providerReadiness.configState}
-                </span>
-              </div>
-
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
+              <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+                Join a meeting with a bot
+              </h2>
+              <p className="mt-1 text-sm text-[#3F5363]">
+                Paste a Google Meet URL and create a Recall bot. It will join and transcribe; status updates when the provider confirms.
+              </p>
+              <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Provider
-                  </p>
-                  <p className="mt-1 text-sm text-[#1B2E3B]">
-                    {status.providerReadiness.configState === "configured"
-                      ? "Configured"
-                      : "Not configured"}
-                  </p>
-                </div>
-                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Bot creation scaffold
-                  </p>
-                  <p className="mt-1 text-sm text-[#1B2E3B]">
-                    {status.providerReadiness.botCreationScaffoldingState === "ready"
-                      ? "Ready"
-                      : "Not ready"}
-                  </p>
-                </div>
-                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Live bot status
-                  </p>
-                  <p className="mt-1 text-sm text-[#1B2E3B] capitalize">
-                    {status.providerReadiness.liveBotState.replaceAll("_", " ")}
-                  </p>
-                </div>
-              </div>
-
-              {status.providerReadiness.configState === "configured" && (
-                <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Create Recall bot
+                    Create bot
                   </p>
                   <p className="mt-1 text-sm text-[#3F5363]">
-                    Paste a Google Meet URL and create a real Recall bot. Status and transcript appear only when the provider confirms.
+                    Enter a Google Meet link below and click Create bot.
                   </p>
                   <form
                     className="mt-3 flex gap-2"
@@ -331,47 +238,36 @@ export default function MeetingPage() {
                     </p>
                   )}
                 </div>
-              )}
 
               {status.activeRecallRun && (
                 <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Current run (provider-confirmed)
+                    Current run
                   </p>
                   <p className="mt-1 text-sm text-[#1B2E3B]">
-                    Run ID: {status.activeRecallRun.id}
-                    {status.activeRecallRun.botId && ` · Bot ID: ${status.activeRecallRun.botId}`}
+                    {status.activeRecallRun.botId && `Bot ID: ${status.activeRecallRun.botId} · `}
+                    Status: {status.activeRecallRun.providerStatus ?? status.activeRecallRun.status}
                   </p>
-                  <p className="mt-1 text-sm text-[#3F5363]">
-                    Status: {status.activeRecallRun.status}
-                    {status.activeRecallRun.providerStatus && ` · Provider: ${status.activeRecallRun.providerStatus}`}
-                  </p>
-                  {status.activeRecallRun.artifactMetadata && (
+                  {status.activeRecallRun.artifactMetadata && status.activeRecallRun.artifactMetadata.transcriptEntries > 0 && (
                     <p className="mt-1 text-sm text-[#3F5363]">
-                      Transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s) received.
-                    </p>
-                  )}
-                  {status.activeRecallRun.providerError && (
-                    <p className="mt-1 text-sm text-[#7c3a2d]">
-                      Provider error: {status.activeRecallRun.providerError}
+                      Transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s)
                     </p>
                   )}
                 </div>
-              )}
-
-              <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]">
-                API base: {status.providerReadiness.apiBaseUrl}
-              </div>
 
               {status.providerReadiness.missingEnv.length > 0 && (
                 <div className="mt-3 rounded-relay-inner border border-[#7c3a2d]/20 bg-[#7c3a2d]/5 p-3 text-sm text-[#7c3a2d]">
-                  Missing server env: {status.providerReadiness.missingEnv.join(", ")}
+                  Missing: {status.providerReadiness.missingEnv.join(", ")}
                 </div>
               )}
+            </div>
+          )}
 
-              <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]">
-                Webhook secret: {status.providerReadiness.webhookConfigured ? "configured" : "not configured"}
-              </div>
+          {status.providerReadiness && status.providerReadiness.configState !== "configured" && (
+            <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+              <p className="text-sm text-[#3F5363]">
+                Recall is not configured. Set RECALL_API_KEY (and RECALL_WEBHOOK_SECRET) in server env to create bots.
+              </p>
             </div>
           )}
 
@@ -388,48 +284,6 @@ export default function MeetingPage() {
         </div>
 
         <div className="space-y-4">
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              Current assumptions
-            </h2>
-            <div className="mt-3 space-y-2">
-              {status.assumptions.map((assumption) => (
-                <div
-                  key={assumption}
-                  className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]"
-                >
-                  {assumption}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              What still requires action
-            </h2>
-            <div className="mt-3 space-y-2">
-              {status.manualSteps.map((step) => (
-                <div
-                  key={step}
-                  className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#3F5363]"
-                >
-                  {step}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              Future meeting writing
-            </h2>
-            <p className="mt-2 text-sm text-[#3F5363]">
-              {status.customizationSummary ??
-                "Meeting personalization is ready for future summaries and updates."}
-            </p>
-          </div>
-
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Upcoming Google Meet

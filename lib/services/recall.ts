@@ -104,27 +104,47 @@ export function getRecallProviderReadiness(): RecallProviderReadiness {
   }
 }
 
+/** Public base URL for assets (e.g. bot avatar). Uses NEXTAUTH_URL or RELAY_PUBLIC_URL. */
+function getPublicBaseUrl(): string | null {
+  const url =
+    process.env.RELAY_PUBLIC_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim() ||
+    ""
+  if (!url) return null
+  try {
+    const u = new URL(url)
+    const host = u.hostname.toLowerCase()
+    if (host === "localhost" || host === "127.0.0.1" || host.startsWith("127.")) return null
+  } catch {
+    return null
+  }
+  return url.replace(/\/$/, "")
+}
+
 export function buildRecallBotCreatePayload(input: RecallBotCreateRequest): Record<string, unknown> {
   const base: Record<string, unknown> = {
     meeting_url: input.meetingUrl,
-    bot_name: input.botName,
+    bot_name: input.botName?.trim() || "Relay",
     deduplication_key: input.deduplicationKey,
     metadata: input.metadata,
   }
-  const webhookBase = getRecallWebhookBaseUrl()
-  const webhookSecret = process.env.RECALL_WEBHOOK_SECRET?.trim()
-  if (webhookBase && webhookSecret) {
-    const webhookUrl = `${webhookBase}/api/webhooks/recall`
-    base.recording_config = {
-      realtime_endpoints: [
-        {
-          type: "webhook",
-          url: webhookUrl,
-          events: ["transcript.data"],
+
+  base.recording_config = {
+    transcript: {
+      provider: {
+        recallai_streaming: {
+          mode: "prioritize_low_latency",
+          language_code: "en",
         },
-      ],
-    }
+      },
+    },
   }
+
+  const avatarUrl = getPublicBaseUrl()
+  if (avatarUrl) {
+    base.image_url = `${avatarUrl}/relay-logo.png`
+  }
+
   return base
 }
 

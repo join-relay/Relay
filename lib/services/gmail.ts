@@ -74,7 +74,19 @@ function decodeBase64Url(value?: string | null) {
   if (!value) return ""
   const normalized = value.replace(/-/g, "+").replace(/_/g, "/")
   const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")
-  return Buffer.from(padded, "base64").toString("utf8")
+  const buf = Buffer.from(padded, "base64")
+  let text = buf.toString("utf8")
+  if ((text.match(/\uFFFD/g) ?? []).length > 3) {
+    text = buf.toString("latin1")
+  }
+  return text
+}
+
+/** Normalize email snippet/body for display: decode entities and strip control chars that can break UI. */
+export function normalizeEmailTextForDisplay(value?: string | null) {
+  if (!value) return ""
+  const decoded = decodeHtmlEntities(value)
+  return decoded.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ").trim()
 }
 
 function stripHtml(html: string) {
@@ -294,7 +306,7 @@ export async function getLiveGmailThreads(email?: string | null, limit = 18): Pr
           date: detail.data.internalDate
             ? new Date(Number(detail.data.internalDate)).toISOString()
             : new Date().toISOString(),
-          snippet: decodeHtmlEntities(detail.data.snippet) ?? "",
+          snippet: normalizeEmailTextForDisplay(detail.data.snippet) ?? "",
           isUnread: labels.includes("UNREAD"),
           labels,
         } satisfies GmailThread
@@ -354,7 +366,7 @@ export async function getLiveGmailThreadById(
       date: latestMessage?.internalDate
         ? new Date(Number(latestMessage.internalDate)).toISOString()
         : new Date().toISOString(),
-      snippet: decodeHtmlEntities(latestMessage?.snippet) ?? "",
+      snippet: normalizeEmailTextForDisplay(latestMessage?.snippet) ?? "",
       isUnread: labels.includes("UNREAD"),
       labels,
     } satisfies GmailThread
@@ -410,7 +422,7 @@ export async function getGmailThreadContext(
         date: message.internalDate
           ? new Date(Number(message.internalDate)).toISOString()
           : new Date().toISOString(),
-        snippet: decodeHtmlEntities(message.snippet) || bodyPreview,
+        snippet: normalizeEmailTextForDisplay(message.snippet) || bodyPreview,
         bodyPreview,
         bodyText,
         rfcMessageId: getHeader(headers, "Message-ID") ?? getHeader(headers, "Message-Id") ?? undefined,
@@ -494,7 +506,7 @@ export async function getRecentSentEmailSamples(
 
       return {
         subject,
-        snippet: decodeHtmlEntities(detail.data.snippet) || bodyText,
+        snippet: normalizeEmailTextForDisplay(detail.data.snippet) || bodyText,
         bodyText,
       } satisfies SentEmailSample
     })

@@ -8,7 +8,8 @@ export interface ActionsResponse {
 
 export const BRIEFING_QUERY_KEY = ["briefing"] as const
 export const ACTIONS_QUERY_KEY = ["actions"] as const
-export const LIVE_REFRESH_INTERVAL_MS = 30000
+/** Poll every 15s so inbox/actions feel closer to real-time; refetch on focus/visibility. */
+export const LIVE_REFRESH_INTERVAL_MS = 15000
 
 async function readJson<T>(response: Response, fallbackMessage: string) {
   if (!response.ok) {

@@ -1,9 +1,4 @@
-import {
-  getOptionalSession,
-  isGoogleAuthConfigured,
-  signInIfConfigured,
-  signOutIfConfigured,
-} from "@/auth"
+import { getOptionalSession, isGoogleAuthConfigured, signInIfConfigured } from "@/auth"
 import { revalidatePath } from "next/cache"
 import {
   getDefaultRelayCustomizationSettings,
@@ -14,7 +9,6 @@ import { getUpcomingGoogleMeet, getLiveCalendarEvents } from "@/lib/services/cal
 import { getEmailStyleProfile } from "@/lib/services/email-style"
 import {
   applyCalendarReadFailureToStatus,
-  clearGoogleAccountConnection,
   getBaseGoogleIntegrationStatus,
 } from "@/lib/services/google-auth"
 import type {
@@ -145,17 +139,6 @@ export default async function SettingsPage() {
     await signInIfConfigured("google", { redirectTo: "/settings" })
   }
 
-  async function disconnectGoogle() {
-    "use server"
-
-    await clearGoogleAccountConnection(sessionEmail)
-    if (!isGoogleAuthConfigured()) {
-      return
-    }
-
-    await signOutIfConfigured({ redirectTo: "/settings" })
-  }
-
   async function saveCustomization(formData: FormData) {
     "use server"
 
@@ -269,16 +252,9 @@ export default async function SettingsPage() {
               Connect Google
             </button>
           </form>
-
-          <form action={disconnectGoogle}>
-            <button
-              type="submit"
-              disabled={!authConfigured}
-              className="inline-flex items-center gap-2 rounded-relay-control border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[#1B2E3B] transition-smooth hover:bg-[#e8edf3] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Disconnect
-            </button>
-          </form>
+          <p className="text-xs text-[#3F5363]">
+            Sign out from the header to switch accounts.
+          </p>
         </div>
       </div>
 

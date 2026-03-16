@@ -678,8 +678,11 @@ function buildSignOff(
   const signatureStartsWithSignOff = signatureLines.length > 0 && isSignOffLine(signatureLines[0])
 
   if (settings.includeSignOff && !signatureStartsWithSignOff) {
-    if (explicitSignOffExample) {
-      lines.push(explicitSignOffExample)
+    const signOff =
+      explicitSignOffExample ||
+      styleProfile.styleAnchors.closingLineExamples?.[0]?.trim()
+    if (signOff) {
+      lines.push(signOff)
     } else {
       switch (styleProfile.signOffStyle) {
         case "best_regards":
@@ -697,7 +700,7 @@ function buildSignOff(
           break
         case "best":
         default:
-          lines.push("Best,")
+          lines.push("Best regards,")
           break
       }
     }

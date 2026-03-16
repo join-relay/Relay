@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getOptionalSession } from "@/auth"
 import {
   buildRecallBotCreatePayload,
   buildRecallMeetingRun,
@@ -18,12 +19,17 @@ function isGoogleMeetUrl(meetingUrl: string) {
 /**
  * Create a real Recall bot for a Google Meet and persist the run.
  * Returns provider-confirmed run only when Recall API confirms creation.
+ * Bot name is set to "(Name)'s Relay" from session when available.
  */
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Partial<RecallBotCreateRequest>
+  const session = await getOptionalSession()
+  const displayName = session?.user?.name?.trim()
   const providerReadiness = getRecallProviderReadiness()
   const meetingUrl = body.meetingUrl?.trim() ?? ""
-  const botName = body.botName?.trim() || "Relay"
+  const botName =
+    body.botName?.trim() ||
+    (displayName ? `${displayName}'s Relay` : "Relay")
 
   if (!meetingUrl) {
     return NextResponse.json(
