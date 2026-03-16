@@ -254,6 +254,7 @@ export default function MeetingPage() {
                     </p>
                   )}
                 </div>
+              )}
 
               {status.providerReadiness.missingEnv.length > 0 && (
                 <div className="mt-3 rounded-relay-inner border border-[#7c3a2d]/20 bg-[#7c3a2d]/5 p-3 text-sm text-[#7c3a2d]">
