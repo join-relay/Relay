@@ -2,6 +2,7 @@
 
 import { useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { BRIEFING_QUERY_KEY } from "@/lib/client/dashboard-queries"
 import { JoinValidationPanel } from "@/components/meeting/JoinValidationPanel"
 import { MeetingPageHeader } from "@/components/meeting/MeetingPageHeader"
 import type {
@@ -60,6 +61,7 @@ function SuggestedEventsCard({
     onSuccess: () => {
       onUpdate()
       queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })
+      queryClient.invalidateQueries({ queryKey: BRIEFING_QUERY_KEY })
     },
   })
   const dismissMutation = useMutation({

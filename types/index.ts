@@ -37,6 +37,9 @@ export interface SentEmailSample {
   bodyText: string
 }
 
+/** Current user's response to an invite. Only set when the user is an attendee. */
+export type CalendarEventResponseStatus = "needsAction" | "accepted" | "declined" | "tentative"
+
 export interface CalendarEvent {
   id: string
   title: string
@@ -51,6 +54,8 @@ export interface CalendarEvent {
   joinUrl?: string
   externalEventId?: string
   isMeeting?: boolean
+  /** Current user's invite response. Present when user is an attendee; "needsAction" = show Accept/Decline. */
+  responseStatus?: CalendarEventResponseStatus
 }
 
 export interface PriorityItem {

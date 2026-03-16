@@ -21,12 +21,10 @@ export function JoinValidationPanel({
   return (
     <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
       <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-        Meet link readiness
+        Check meeting link
       </h2>
       <p className="mt-2 text-sm text-[#3F5363]">
-        Paste one real Google Meet URL to confirm Relay recognizes it as an
-        in-scope meeting link. This does not claim Relay joined, spoke, or
-        retrieved anything from the meeting.
+        Paste a Google Meet URL to validate it.
       </p>
 
       <form

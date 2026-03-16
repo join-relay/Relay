@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   if (body.action === "reset") {
-    resetPersistedActionState()
+    await resetPersistedActionState()
     await resetGeneratedDraftsStore()
     await resetDevTestState()
     resetRememberedActionBases()

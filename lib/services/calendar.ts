@@ -1,7 +1,7 @@
 import "server-only"
 
 import { google } from "googleapis"
-import type { CalendarEvent } from "@/types"
+import type { CalendarEvent, CalendarEventResponseStatus } from "@/types"
 import { getDevLiveDataState } from "@/lib/persistence/dev-test-state"
 import {
   clearGoogleAccountConnection,
@@ -42,6 +42,22 @@ function getGoogleMeetLink(event: {
     )?.uri ?? null
 
   return event.hangoutLink ?? conferenceEntry ?? undefined
+}
+
+function getAttendeeResponseStatus(
+  event: { attendees?: Array<{ email?: string | null; responseStatus?: string | null }> | null },
+  userEmail: string | null | undefined
+): CalendarEventResponseStatus | undefined {
+  if (!userEmail?.trim() || !event.attendees?.length) return undefined
+  const normalized = userEmail.trim().toLowerCase()
+  const attendee = event.attendees.find(
+    (a) => a.email?.trim().toLowerCase() === normalized
+  )
+  const status = attendee?.responseStatus?.trim().toLowerCase()
+  if (status === "needsaction" || status === "accepted" || status === "declined" || status === "tentative") {
+    return status === "needsaction" ? "needsAction" : (status as CalendarEventResponseStatus)
+  }
+  return undefined
 }
 
 export function isGoogleMeetEvent(event: CalendarEvent) {
@@ -149,6 +165,7 @@ export async function getLiveCalendarEvents(email?: string | null, limit = 25): 
 
         return (response.data.items ?? []).map((event) => {
           const joinUrl = getGoogleMeetLink(event)
+          const responseStatus = getAttendeeResponseStatus(event, email)
 
           return {
             id: `${calendarEntry.id ?? "primary"}:${event.id ?? crypto.randomUUID()}`,
@@ -163,6 +180,7 @@ export async function getLiveCalendarEvents(email?: string | null, limit = 25): 
             joinUrl,
             externalEventId: event.iCalUID ?? event.id ?? undefined,
             isMeeting: Boolean(joinUrl),
+            responseStatus,
           } satisfies CalendarEvent
         })
       })
@@ -190,6 +208,38 @@ function parseEventId(compositeId: string): { calendarId: string; eventId: strin
     }
   }
   return { calendarId: "primary", eventId: compositeId }
+}
+
+/** Accept or decline a calendar event invite. Requires calendar.events scope. */
+export async function respondToCalendarEvent(
+  email: string | null | undefined,
+  compositeEventId: string,
+  response: "accepted" | "declined"
+): Promise<{ id: string }> {
+  const accessToken = await getGoogleAccessToken(email)
+  if (!accessToken) {
+    throw new Error("No Google access token is available for Calendar")
+  }
+  if (!email?.trim()) {
+    throw new Error("User email is required to respond to an event")
+  }
+
+  const { calendarId, eventId: apiEventId } = parseEventId(compositeEventId)
+  const calendar = google.calendar({
+    version: "v3",
+    auth: getGoogleOAuthClient(accessToken),
+  })
+
+  await calendar.events.patch({
+    calendarId,
+    eventId: apiEventId,
+    requestBody: {
+      attendees: [{ email: email.trim(), responseStatus: response }],
+    },
+    sendUpdates: "all",
+  })
+
+  return { id: compositeEventId }
 }
 
 /** Reschedule a calendar event. Requires calendar.events scope. */

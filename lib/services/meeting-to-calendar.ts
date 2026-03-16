@@ -27,6 +27,10 @@ export type MeetingReferenceTime = {
   referenceEnd: string
 }
 
+const USER_TIMEZONE =
+  (typeof process !== "undefined" && (process.env.USER_TIMEZONE?.trim() || process.env.CALENDAR_DEFAULT_TIMEZONE?.trim())) ||
+  "America/Edmonton"
+
 /**
  * Extract proposed follow-up meetings from transcript (and optional summary).
  * Uses OpenAI to find phrases like "let's meet same time next week" and resolve to ISO start/end.
@@ -60,10 +64,10 @@ export async function extractProposedMeetings(
             role: "system",
             content: `You extract follow-up or new meetings agreed in a meeting transcript.
 Reference meeting: start ${refStart}, end ${refEnd} (ISO).
-For relative times like "same time next week" use that reference (same weekday and time next week).
-Output a JSON array of objects only, no markdown. Each object: { "title": string, "start": string (ISO), "end": string (ISO), "confidence": "high"|"medium"|"low", "rawPhrase": string (exact quote from transcript) }.
-If there are no clear follow-up meetings, output [].
-Use UTC for all times.`,
+User timezone: ${USER_TIMEZONE}. CRITICAL: Interpret ALL times (e.g. "8 AM tomorrow", "meet at 8") as that time in the user's timezone, then convert to UTC for start/end. "8 AM tomorrow" = 08:00 local tomorrow = one day after reference date at 08:00 in ${USER_TIMEZONE} → output that moment in ISO with Z. Do NOT output 08:00 UTC for "8 AM" (that would show as 2 AM in Edmonton).
+For relative times like "same time next week" use the reference (same weekday and time next week).
+Output a JSON array of objects only, no markdown. Each object: { "title": string, "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string }.
+If there are no clear follow-up meetings, output [].`,
           },
           {
             role: "user",

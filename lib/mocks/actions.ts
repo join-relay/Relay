@@ -193,7 +193,9 @@ function formatExecutionTime(iso: string) {
   }
 }
 
-export function getActionStatus(id: string): ActionStoreEntry | undefined {
+export async function getActionStatus(
+  id: string
+): Promise<ActionStoreEntry | undefined> {
   return getPersistedActionState(id)
 }
 
@@ -262,12 +264,12 @@ function getActionSourceFingerprint(action: StoredPendingAction): string {
   })
 }
 
-export function setActionApproved(
+export async function setActionApproved(
   id: string,
   base: StoredPendingAction,
   reviewedContent: PendingAction["proposedAction"],
   executionSummary?: string
-): { executedAt: string; executionSummary: string } {
+): Promise<{ executedAt: string; executionSummary: string }> {
   const executedAt = new Date().toISOString()
   const summary =
     executionSummary ??
@@ -276,7 +278,7 @@ export function setActionApproved(
       : reviewedContent && "eventTitle" in reviewedContent
         ? `${(reviewedContent as { eventTitle: string; proposedStart: string }).eventTitle} rescheduled to ${formatExecutionTime((reviewedContent as { proposedStart: string }).proposedStart)}`
         : "Action executed")
-  setPersistedActionState(id, {
+  await setPersistedActionState(id, {
     status: "approved",
     sourceFingerprint: getActionSourceFingerprint(base),
     reviewedContent,
@@ -286,30 +288,35 @@ export function setActionApproved(
   return { executedAt, executionSummary: summary }
 }
 
-export function setActionRejected(id: string, base: StoredPendingAction): void {
-  setPersistedActionState(id, {
+export async function setActionRejected(
+  id: string,
+  base: StoredPendingAction
+): Promise<void> {
+  await setPersistedActionState(id, {
     status: "rejected",
     sourceFingerprint: getActionSourceFingerprint(base),
   })
 }
 
-export function setActionEditedContent(
+export async function setActionEditedContent(
   id: string,
   base: StoredPendingAction,
   reviewedContent: PendingAction["proposedAction"]
-): void {
-  setPersistedActionState(id, {
+): Promise<void> {
+  await setPersistedActionState(id, {
     status: "pending",
     sourceFingerprint: getActionSourceFingerprint(base),
     reviewedContent,
   })
 }
 
-export function mergeActionWithStore(base: StoredPendingAction): PendingAction {
-  const entry = getPersistedActionState(base.id)
+export async function mergeActionWithStore(
+  base: StoredPendingAction
+): Promise<PendingAction> {
+  const entry = await getPersistedActionState(base.id)
   const sourceFingerprint = getActionSourceFingerprint(base)
   if (entry && entry.sourceFingerprint !== sourceFingerprint) {
-    clearPersistedActionState(base.id)
+    await clearPersistedActionState(base.id)
   }
   const current = entry?.sourceFingerprint === sourceFingerprint ? entry : undefined
   const status = current?.status ?? "pending"
@@ -322,8 +329,8 @@ export function mergeActionWithStore(base: StoredPendingAction): PendingAction {
   }
 }
 
-export function getAllActions(): PendingAction[] {
-  return seededActions.map(mergeActionWithStore)
+export async function getAllActions(): Promise<PendingAction[]> {
+  return Promise.all(seededActions.map(mergeActionWithStore))
 }
 
 export function resetRememberedActionBases() {

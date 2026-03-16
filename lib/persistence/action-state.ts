@@ -1,11 +1,9 @@
 import "server-only"
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
-import path from "node:path"
+import { getStore, setStore } from "@/lib/persistence/store-backend"
 import type { PendingAction } from "@/types"
 
-const STORE_DIR = path.join(process.cwd(), ".relay")
-const STORE_FILE = path.join(STORE_DIR, "action-state.json")
+const STORE_KEY = "action-state"
 
 export interface PersistedActionState {
   status: "pending" | "approved" | "rejected"
@@ -18,85 +16,67 @@ export interface PersistedActionState {
 
 type ActionStateStore = Record<string, PersistedActionState>
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __relayPersistedActionStateStore: ActionStateStore | undefined
-}
-
-function readStoreFromDisk(): ActionStateStore {
-  try {
-    const raw = readFileSync(STORE_FILE, "utf8")
-    const parsed = JSON.parse(raw) as Record<string, Partial<PersistedActionState>>
-
-    return Object.fromEntries(
-      Object.entries(parsed).flatMap(([actionId, value]) => {
-        if (!value || typeof value !== "object") return []
-        if (
-          value.status !== "pending" &&
-          value.status !== "approved" &&
-          value.status !== "rejected"
-        ) {
-          return []
-        }
-        if (typeof value.sourceFingerprint !== "string") return []
-
-        return [
-          [
-            actionId,
-            {
-              status: value.status,
-              sourceFingerprint: value.sourceFingerprint,
-              reviewedContent: value.reviewedContent,
-              executedAt: value.executedAt,
-              executionSummary: value.executionSummary,
-              updatedAt:
-                typeof value.updatedAt === "string" ? value.updatedAt : new Date(0).toISOString(),
-            } satisfies PersistedActionState,
-          ],
-        ]
-      })
+async function loadStore(): Promise<ActionStateStore> {
+  const raw = await getStore(STORE_KEY)
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return {}
+  const parsed = raw as Record<string, unknown>
+  const out: ActionStateStore = {}
+  for (const [actionId, value] of Object.entries(parsed)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue
+    const v = value as Record<string, unknown>
+    if (
+      v.status !== "pending" &&
+      v.status !== "approved" &&
+      v.status !== "rejected"
     )
-  } catch (error) {
-    const isMissing =
-      error instanceof Error && "code" in error && (error as NodeJS.ErrnoException).code === "ENOENT"
-    if (isMissing) return {}
-    console.error("Failed to read action state store:", error)
-    return {}
+      continue
+    if (typeof v.sourceFingerprint !== "string") continue
+    out[actionId] = {
+      status: v.status,
+      sourceFingerprint: v.sourceFingerprint,
+      reviewedContent: v.reviewedContent as PersistedActionState["reviewedContent"],
+      executedAt: typeof v.executedAt === "string" ? v.executedAt : undefined,
+      executionSummary:
+        typeof v.executionSummary === "string" ? v.executionSummary : undefined,
+      updatedAt:
+        typeof v.updatedAt === "string" ? v.updatedAt : new Date(0).toISOString(),
+    }
   }
+  return out
 }
 
-function getStore() {
-  globalThis.__relayPersistedActionStateStore ??= readStoreFromDisk()
-  return globalThis.__relayPersistedActionStateStore
+async function saveStore(store: ActionStateStore): Promise<void> {
+  await setStore(STORE_KEY, store)
 }
 
-function persistStore(store: ActionStateStore) {
-  mkdirSync(STORE_DIR, { recursive: true })
-  writeFileSync(STORE_FILE, JSON.stringify(store, null, 2), "utf8")
-}
-
-export function getPersistedActionState(actionId: string) {
-  return getStore()[actionId]
-}
-
-export function setPersistedActionState(actionId: string, value: Omit<PersistedActionState, "updatedAt">) {
-  const store = getStore()
-  store[actionId] = {
-    ...value,
-    updatedAt: new Date().toISOString(),
-  }
-  persistStore(store)
+export async function getPersistedActionState(
+  actionId: string
+): Promise<PersistedActionState | undefined> {
+  const store = await loadStore()
   return store[actionId]
 }
 
-export function clearPersistedActionState(actionId: string) {
-  const store = getStore()
-  if (!(actionId in store)) return
-  delete store[actionId]
-  persistStore(store)
+export async function setPersistedActionState(
+  actionId: string,
+  value: Omit<PersistedActionState, "updatedAt">
+): Promise<PersistedActionState> {
+  const store = await loadStore()
+  const entry: PersistedActionState = {
+    ...value,
+    updatedAt: new Date().toISOString(),
+  }
+  store[actionId] = entry
+  await saveStore(store)
+  return entry
 }
 
-export function resetPersistedActionState() {
-  globalThis.__relayPersistedActionStateStore = {}
-  persistStore(globalThis.__relayPersistedActionStateStore)
+export async function clearPersistedActionState(actionId: string): Promise<void> {
+  const store = await loadStore()
+  if (!(actionId in store)) return
+  delete store[actionId]
+  await saveStore(store)
+}
+
+export async function resetPersistedActionState(): Promise<void> {
+  await saveStore({})
 }

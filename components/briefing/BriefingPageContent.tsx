@@ -1,6 +1,7 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useCallback } from "react"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { BriefingCard } from "@/components/briefing/BriefingCard"
 import { InboxSummary } from "@/components/briefing/InboxSummary"
 import { CalendarSummary } from "@/components/briefing/CalendarSummary"
@@ -14,6 +15,7 @@ import { useLiveRefetch } from "@/lib/client/use-live-refetch"
 import type { Briefing } from "@/types"
 
 export function BriefingPageContent({ initialData }: { initialData: Briefing }) {
+  const queryClient = useQueryClient()
   const { data, refetch } = useQuery({
     queryKey: BRIEFING_QUERY_KEY,
     queryFn: fetchBriefing,
@@ -25,6 +27,22 @@ export function BriefingPageContent({ initialData }: { initialData: Briefing }) 
     refetchOnMount: "always",
   })
   useLiveRefetch(refetch)
+
+  const onRespond = useCallback(
+    async (eventId: string, response: "accepted" | "declined") => {
+      const res = await fetch("/api/calendar/events/respond", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, response }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error ?? "Failed to update response")
+      }
+      await queryClient.invalidateQueries({ queryKey: BRIEFING_QUERY_KEY })
+    },
+    [queryClient]
+  )
 
   return (
     <div className="space-y-6">
@@ -52,6 +70,7 @@ export function BriefingPageContent({ initialData }: { initialData: Briefing }) 
           conflicts={data.calendarSummary?.conflicts ?? []}
           upcomingMeeting={data.calendarSummary?.upcomingMeeting}
           suggestedFromEmail={data.calendarSummary?.suggestedFromEmail}
+          onRespond={onRespond}
         />
       </div>
       <div className="animate-relay-fade-in opacity-0 [animation-delay:150ms] [animation-fill-mode:forwards]">

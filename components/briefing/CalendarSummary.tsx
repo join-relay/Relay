@@ -1,7 +1,8 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
-import { Calendar, AlertCircle, Mail } from "lucide-react"
+import { Calendar, AlertCircle, Mail, Check, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { CalendarEvent, ProposedCalendarEvent } from "@/types"
 
@@ -10,6 +11,8 @@ interface CalendarSummaryProps {
   conflicts: CalendarEvent[]
   upcomingMeeting?: CalendarEvent | null
   suggestedFromEmail?: Array<(ProposedCalendarEvent & { actionId: string })>
+  /** When set, events with responseStatus "needsAction" show Accept/Decline; called after API success. */
+  onRespond?: (eventId: string, response: "accepted" | "declined") => Promise<void>
 }
 
 function formatTime(iso: string) {
@@ -42,7 +45,20 @@ export function CalendarSummary({
   conflicts,
   upcomingMeeting,
   suggestedFromEmail,
+  onRespond,
 }: CalendarSummaryProps) {
+  const [respondingId, setRespondingId] = useState<string | null>(null)
+
+  async function handleRespond(eventId: string, response: "accepted" | "declined") {
+    if (!onRespond) return
+    setRespondingId(eventId)
+    try {
+      await onRespond(eventId, response)
+    } finally {
+      setRespondingId(null)
+    }
+  }
+
   if (events.length === 0 && !suggestedFromEmail?.length) {
     return (
       <div className="rounded-relay-card bg-white/80 backdrop-blur-sm border border-[var(--border)] p-5 shadow-relay-soft">
@@ -117,7 +133,35 @@ export function CalendarSummary({
               {formatTime(event.start)} – {formatTime(event.end)}
               {event.location && ` · ${event.location}`}
               {event.calendarName && ` · ${event.calendarName}`}
+              {event.responseStatus === "accepted" && (
+                <span className="ml-1.5 text-[#1B5E20]">· Accepted</span>
+              )}
+              {event.responseStatus === "declined" && (
+                <span className="ml-1.5 text-[#7c3a2d]">· Declined</span>
+              )}
             </p>
+            {event.responseStatus === "needsAction" && onRespond && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={respondingId === event.id}
+                  onClick={() => handleRespond(event.id, "accepted")}
+                  className="inline-flex items-center gap-1.5 rounded-relay-control bg-[#1B5E20] px-2.5 py-1.5 text-xs font-medium text-white transition-smooth hover:bg-[#2E7D32] disabled:opacity-60"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                  {respondingId === event.id ? "Updating…" : "Accept"}
+                </button>
+                <button
+                  type="button"
+                  disabled={respondingId === event.id}
+                  onClick={() => handleRespond(event.id, "declined")}
+                  className="inline-flex items-center gap-1.5 rounded-relay-control border border-[var(--border)] bg-white/80 px-2.5 py-1.5 text-xs font-medium text-[#3F5363] transition-smooth hover:bg-[#e8edf3] disabled:opacity-60"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Decline
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>

@@ -1180,10 +1180,15 @@ async function deriveLiveDraftEmailActions(
       const threadContext = normalizeThreadContextForDrafting(
         await getGmailThreadContext(sessionEmail, candidate.thread.id).catch(() => null)
       )
+      const activeThreadText = buildActiveThreadText(candidate.thread, threadContext)
+      const proposedCalendarEvent = await extractProposedMeetingFromEmail(
+        activeThreadText,
+        candidate.thread.subject
+      ).catch(() => null)
       const cacheKey = buildDraftCacheKey({
         threadId: candidate.thread.id,
         latestMessageId: candidate.thread.messageId ?? threadContext?.messages.at(-1)?.id,
-        activeThreadText: buildActiveThreadText(candidate.thread, threadContext),
+        activeThreadText,
         settings,
         styleProfile,
       })
@@ -1205,6 +1210,7 @@ async function deriveLiveDraftEmailActions(
 
       return {
         ...candidate.action,
+        proposedCalendarEvent: proposedCalendarEvent ?? undefined,
         personalization: {
           styleSource: candidate.action.personalization?.styleSource ?? styleProfile.source,
           settingsApplied: candidate.action.personalization?.settingsApplied ?? true,
@@ -1354,32 +1360,36 @@ function deriveLiveRescheduleActions(events: CalendarEvent[]): PendingActionBase
   return []
 }
 
-function hydrateActions(actions: PendingActionBase[], source: ActionsViewState["source"]) {
+async function hydrateActions(
+  actions: PendingActionBase[],
+  source: ActionsViewState["source"]
+): Promise<PendingAction[]> {
   const normalizedActions = actions.map(withNormalizedProvenance)
   rememberActionBases(normalizedActions)
-  const merged = normalizedActions
-    .map(mergeActionWithStore)
-    .filter((a) => a.status !== "rejected")
+  const merged = (await Promise.all(normalizedActions.map(mergeActionWithStore))).filter(
+    (a) => a.status !== "rejected"
+  )
 
   if (source !== "google") {
     return merged
   }
 
   const seen = new Set(normalizedActions.map((action) => action.id))
-  const carried = getStoredActions()
+  const carriedActions = getStoredActions()
     .map(withNormalizedProvenance)
     .filter((action) => action.provenance.origin === "live" && !seen.has(action.id))
-    .map(mergeActionWithStore)
-    .filter((action) => action.status === "approved")
+  const carried = (await Promise.all(carriedActions.map(mergeActionWithStore))).filter(
+    (a) => a.status === "approved"
+  )
 
   return [...merged, ...carried].sort(
     (left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
   )
 }
 
-function buildMockActionResult(statusNote: string) {
+async function buildMockActionResult(statusNote: string) {
   return {
-    actions: hydrateActions(seededActions, "mock"),
+    actions: await hydrateActions(seededActions, "mock"),
     viewState: {
       source: "mock" as const,
       statusNote,
@@ -1396,7 +1406,7 @@ async function deriveActionsData() {
   })
 
   if (!googleStatus.canUseLiveBriefing || !session?.user?.email) {
-    return buildMockActionResult(googleStatus.note)
+    return await buildMockActionResult(googleStatus.note)
   }
 
   try {
@@ -1424,13 +1434,13 @@ async function deriveActionsData() {
     ]
 
     if (liveActions.length === 0) {
-      return buildMockActionResult(
+      return await buildMockActionResult(
         "Relay could not derive a live Gmail reply or Calendar reschedule from the current Google data, so it is showing explicit demo fallback actions."
       )
     }
 
     return {
-      actions: hydrateActions(liveActions, "google"),
+      actions: await hydrateActions(liveActions, "google"),
       viewState: {
         source: "google" as const,
         statusNote: hasOpenAIReasoning()
@@ -1439,7 +1449,7 @@ async function deriveActionsData() {
       },
     }
   } catch (error) {
-    return buildMockActionResult(
+    return await buildMockActionResult(
       error instanceof Error
         ? `Live Google action sourcing failed, so Relay fell back to explicit demo actions: ${error.message}`
         : "Live Google action sourcing failed, so Relay fell back to explicit demo actions."
@@ -1469,7 +1479,7 @@ async function generateDraftForActionWithIdentity(params: {
   const provenance = inferActionProvenance(base)
 
   if (provenance.provider !== "gmail" || provenance.origin !== "live") {
-    return mergeActionWithStore(base)
+    return await mergeActionWithStore(base)
   }
 
   const id = params.id
@@ -1634,7 +1644,8 @@ async function generateDraftForActionWithIdentity(params: {
     }
 
     rememberActionBases([updatedBase])
-    return mergeActionWithStore(updatedBase)
+    await setActionEditedContent(id, base, updatedBase.proposedAction)
+    return await mergeActionWithStore(updatedBase)
   }
 
   const deterministicCore = buildDraftCoreBody(
@@ -1810,7 +1821,8 @@ async function generateDraftForActionWithIdentity(params: {
   }
 
   rememberActionBases([updatedBase])
-  return mergeActionWithStore(updatedBase)
+  await setActionEditedContent(id, base, updatedBase.proposedAction)
+  return await mergeActionWithStore(updatedBase)
 }
 
 /** Replaces demo name in email bodies with the given display name (for personalized display when user is connected). */
@@ -1858,7 +1870,7 @@ export async function generateDraftForAction(
   const userEmail = session?.user?.email ?? null
   if (!userEmail) {
     const base = await getActionBaseById(id)
-    return base ? mergeActionWithStore(base) : null
+    return base ? await mergeActionWithStore(base) : null
   }
 
   return generateDraftForActionWithIdentity({
@@ -1890,7 +1902,7 @@ export async function updateActionContent(
   const base = await getActionBaseById(id)
   if (!base) return null
 
-  const mergedBase = mergeActionWithStore(base)
+  const mergedBase = await mergeActionWithStore(base)
   if (mergedBase.status === "approved" || mergedBase.status === "rejected") {
     throw new Error("Cannot edit approved or rejected action")
   }
@@ -1906,8 +1918,8 @@ export async function updateActionContent(
         }
       : content
 
-  setActionEditedContent(id, base, normalizedContent)
-  return mergeActionWithStore(base)
+  await setActionEditedContent(id, base, normalizedContent)
+  return await mergeActionWithStore(base)
 }
 
 function isDraftEmailPayload(
@@ -1956,7 +1968,7 @@ export async function approveAction(
   const base = await getActionBaseById(id)
   if (!base) return null
 
-  const mergedBase = mergeActionWithStore(base)
+  const mergedBase = await mergeActionWithStore(base)
   if (mergedBase.status === "approved") {
     throw new Error("Action already approved")
   }
@@ -2040,19 +2052,15 @@ export async function approveAction(
     }
   }
 
-  const { executedAt, executionSummary: storedExecutionSummary } = setActionApproved(
-    id,
-    base,
-    contentToExecute,
-    executionSummary
-  )
+  const { executedAt, executionSummary: storedExecutionSummary } =
+    await setActionApproved(id, base, contentToExecute, executionSummary)
   await appendActionExecution({
     ...record,
     id: crypto.randomUUID(),
     executedAt,
     status: "success",
   })
-  const updated = mergeActionWithStore(base)
+  const updated = await mergeActionWithStore(base)
   return {
     ...updated,
     executedAt,
@@ -2064,7 +2072,7 @@ export async function rejectAction(id: string): Promise<PendingAction | null> {
   const base = await getActionBaseById(id)
   if (!base) return null
 
-  const mergedBase = mergeActionWithStore(base)
+  const mergedBase = await mergeActionWithStore(base)
   if (mergedBase.status === "approved") {
     throw new Error("Cannot reject approved action")
   }
@@ -2075,7 +2083,7 @@ export async function rejectAction(id: string): Promise<PendingAction | null> {
   const session = await getOptionalSession()
   const provenance = inferActionProvenance(base)
   const contentToRecord = mergedBase.reviewedContent ?? base.proposedAction
-  setActionRejected(id, base)
+  await setActionRejected(id, base)
   await appendActionExecution({
     id: crypto.randomUUID(),
     actionId: id,
@@ -2092,5 +2100,5 @@ export async function rejectAction(id: string): Promise<PendingAction | null> {
     sourceType: provenance.sourceType,
     sourceIdentifiers: provenance.sourceIdentifiers,
   })
-  return mergeActionWithStore(base)
+  return await mergeActionWithStore(base)
 }

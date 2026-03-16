@@ -43,11 +43,11 @@ export async function extractProposedMeetingFromEmail(
           {
             role: "system",
             content: `You extract a single proposed meeting or call from an email.
-CRITICAL: Interpret ALL times (e.g. "8 PM", "at 8", "3pm") in the user's timezone: ${userTimezone}. "8 PM" means 20:00 in that timezone, then convert to UTC for start/end. Do NOT use 14:00 for "8 PM" or 18:00 for "8 PM".
-Today's date (use for relative times like "tomorrow"): ${new Date().toISOString().slice(0, 10)}.
-Output start and end in ISO 8601 with Z (UTC). Example: 8 PM in ${userTimezone} = that time in local, then convert to UTC for start/end.
-Output a JSON object only, no markdown: { "title": string (short event title), "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string (exact quote from email) }.
-If there is no clear proposed meeting time, output null. Default duration 1 hour if not specified.`,
+User timezone: ${userTimezone}. CRITICAL: Interpret times in the user's timezone then convert to UTC. "8 AM" = 08:00 local → UTC (e.g. 8 AM ${userTimezone} = 14:00 or 15:00 UTC). "8 PM" = 20:00 local → UTC. Do NOT use 08:00 UTC for "8 AM" (that displays as 2 AM in North America). Do NOT use 14:00 for "8 PM".
+Today's date (for "tomorrow" etc.): ${new Date().toISOString().slice(0, 10)}.
+Output start and end in ISO 8601 with Z (UTC). Default duration 1 hour if not specified.
+Output a JSON object only, no markdown: { "title": string, "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string }.
+If no clear proposed meeting time, output null.`,
           },
           {
             role: "user",
