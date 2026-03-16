@@ -8,14 +8,15 @@ import {
 import { getLiveGmailThreads } from "@/lib/services/gmail"
 import { getBaseGoogleIntegrationStatus } from "@/lib/services/google-auth"
 import { enhanceBriefingPriorities } from "@/lib/services/openai-reasoning"
+import { listActions } from "@/lib/services/actions"
 import type { Briefing } from "@/types"
 
 function buildPriorities(briefing: Pick<Briefing, "inboxSummary" | "calendarSummary">) {
   const priorities = []
 
   const replyCandidates = briefing.inboxSummary.threads
-    .filter((thread) => thread.isUnread || /(urgent|asap|deadline|approve|approval|question|\?)/i.test(`${thread.subject} ${thread.snippet}`))
-    .slice(0, 2)
+    .filter((thread) => thread.isUnread || /(urgent|asap|deadline|approve|approval|question|\?|meet|schedule)/i.test(`${thread.subject} ${thread.snippet}`))
+    .slice(0, 5)
 
   for (const thread of replyCandidates) {
     priorities.push({
@@ -80,13 +81,19 @@ export async function getBriefing(): Promise<Briefing> {
   }
 
   try {
-    const [threads, rawEvents] = await Promise.all([
+    const [threads, rawEvents, actionsResult] = await Promise.all([
       getLiveGmailThreads(session.user.email),
       getLiveCalendarEvents(session.user.email),
+      listActions().catch(() => ({ actions: [], viewState: { source: "mock", statusNote: "" } })),
     ])
     const events = getConflictingEvents(rawEvents)
     const conflicts = events.filter((event) => event.isConflict)
     const upcomingMeeting = getUpcomingGoogleMeet(events)
+    const suggestedFromEmail = actionsResult.actions.flatMap((a) =>
+      a.status === "pending" && a.proposedCalendarEvent
+        ? [{ ...a.proposedCalendarEvent, actionId: a.id }]
+        : []
+    )
 
     const briefing: Briefing = {
       displayName: session.user.name ?? googleStatus.displayName ?? "there",
@@ -107,6 +114,7 @@ export async function getBriefing(): Promise<Briefing> {
         events,
         conflicts,
         upcomingMeeting: upcomingMeeting ?? undefined,
+        suggestedFromEmail: suggestedFromEmail.length > 0 ? suggestedFromEmail : undefined,
       },
       priorities: [],
     }

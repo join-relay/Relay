@@ -994,15 +994,15 @@ function generatedBodyLooksGrounded(params: {
     (token) => !contextTokenSet.has(token) && !GENERIC_REPLY_TOKENS.has(token)
   )
 
-  if (openingTokens.length > 0 && openingOverlap === 0) {
+  if (openingTokens.length > 0 && openingOverlap === 0 && contextTokens.length > 5) {
     return false
   }
 
-  if (unsupportedTokens.length >= 8 && overlapRatio < 0.35) {
+  if (unsupportedTokens.length >= 12 && overlapRatio < 0.25) {
     return false
   }
 
-  return overlapCount >= Math.min(2, contextTokens.length) && overlapRatio >= 0.18
+  return overlapCount >= Math.min(1, contextTokens.length) && overlapRatio >= 0.12
 }
 
 function buildDraftBody(

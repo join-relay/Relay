@@ -321,7 +321,16 @@ export async function getLiveGmailThreads(email?: string | null, limit = 18): Pr
       })
     )
 
-    return threads
+    const byThreadId = new Map<string, GmailThread>()
+    for (const t of threads) {
+      const existing = byThreadId.get(t.id)
+      if (!existing || new Date(t.date).getTime() > new Date(existing.date).getTime()) {
+        byThreadId.set(t.id, t)
+      }
+    }
+    const deduped = Array.from(byThreadId.values())
+    deduped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return deduped.slice(0, limit)
   } catch (err) {
     if (isInsufficientScopesError(err) && email) {
       await clearGoogleAccountConnection(email)

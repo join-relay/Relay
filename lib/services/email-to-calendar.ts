@@ -37,10 +37,12 @@ export async function extractProposedMeetingFromEmail(
         messages: [
           {
             role: "system",
-            content: `You extract a single proposed meeting or call from an email (e.g. "let's meet Tuesday at 3pm", "can we do a call next week?", "how about 2pm tomorrow?").
-Today's date context: use current date when resolving relative times like "tomorrow", "next Tuesday".
+            content: `You extract a single proposed meeting or call from an email.
+CRITICAL: Use the EXACT time mentioned in the email. If the email says "8 PM" or "at 8" use 20:00 (8 PM), not 2 PM or 14:00. If it says "2 PM" use 14:00.
+Today's date (use for relative times like "tomorrow", "same time"): ${new Date().toISOString().slice(0, 10)}.
+Interpret all times (e.g. 8 PM, 3pm) as the same calendar day unless the email says another day. Output start and end in ISO 8601 with Z (UTC). If the sender said "8 PM" assume they mean 20:00 local; you may output that time in UTC by assuming a reasonable offset (e.g. US Eastern = -5) so 8 PM Eastern = 01:00 next day Z.
 Output a JSON object only, no markdown: { "title": string (short event title), "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string (exact quote from email) }.
-If there is no clear proposed meeting time, output null. Use UTC for start/end. Default duration 1 hour if not specified.`,
+If there is no clear proposed meeting time, output null. Default duration 1 hour if not specified.`,
           },
           {
             role: "user",

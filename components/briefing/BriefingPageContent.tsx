@@ -51,6 +51,7 @@ export function BriefingPageContent({ initialData }: { initialData: Briefing }) 
           events={data.calendarSummary?.events ?? []}
           conflicts={data.calendarSummary?.conflicts ?? []}
           upcomingMeeting={data.calendarSummary?.upcomingMeeting}
+          suggestedFromEmail={data.calendarSummary?.suggestedFromEmail}
         />
       </div>
       <div className="animate-relay-fade-in opacity-0 [animation-delay:150ms] [animation-fill-mode:forwards]">

@@ -78,6 +78,8 @@ export interface Briefing {
     events: CalendarEvent[]
     conflicts: CalendarEvent[]
     upcomingMeeting?: CalendarEvent
+    /** Suggested meetings extracted from emails (e.g. "let's meet at 8 PM"). */
+    suggestedFromEmail?: Array<ProposedCalendarEvent & { actionId: string }>
   }
   priorities: PriorityItem[]
 }

@@ -242,20 +242,24 @@ export default async function SettingsPage() {
           </p>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
-          <form action={connectGoogle}>
-            <button
-              type="submit"
-              disabled={!authConfigured}
-              className="inline-flex items-center gap-2 rounded-relay-control bg-[#213443] px-4 py-2 text-sm font-medium text-white shadow-relay-soft transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              Connect Google
-            </button>
-          </form>
-          <p className="text-xs text-[#3F5363]">
-            Sign out from the header to switch accounts.
+        {(!sessionEmail || status.status === "not_configured" || status.status === "blocked") && (
+          <div className="mt-4 flex flex-wrap gap-3">
+            <form action={connectGoogle}>
+              <button
+                type="submit"
+                disabled={!authConfigured}
+                className="inline-flex items-center gap-2 rounded-relay-control bg-[#213443] px-4 py-2 text-sm font-medium text-white shadow-relay-soft transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Connect Google
+              </button>
+            </form>
+          </div>
+        )}
+        {sessionEmail && status.status !== "not_configured" && status.status !== "blocked" && (
+          <p className="mt-4 text-xs text-[#3F5363]">
+            Signed in with Google. Sign out from the header to switch accounts.
           </p>
-        </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.95fr,1.05fr]">
