@@ -127,6 +127,12 @@ function DraftEmailReview({
     onCancelEdit?.()
   }
 
+  const isFallback =
+    action.personalization?.generation?.source === "deterministic_fallback"
+  const fallbackReason =
+    action.personalization?.generation?.fallbackReason?.trim() || null
+  const showFallbackError = isFallback && !showEditForm
+
   return (
     <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
       <div className="flex items-center gap-2 text-[#3F5363] mb-3">
@@ -136,7 +142,23 @@ function DraftEmailReview({
         </span>
       </div>
       <div className="space-y-3">
-        {!payload.body.trim() && !showEditForm ? (
+        {showFallbackError ? (
+          <div className="rounded-relay-control border border-amber-200 bg-amber-50/80 p-4">
+            <p className="text-sm text-amber-800">
+              Draft could not be generated.
+              {fallbackReason ? ` ${fallbackReason.replace(/^because\s+/i, "").replace(/\.$/, "")}.` : " Try again or check your API key."}
+            </p>
+            <button
+              type="button"
+              onClick={onRegenerateDraft}
+              disabled={!onRegenerateDraft || isGenerating}
+              className="mt-3 rounded-relay-control bg-[#213443] px-3 py-1.5 text-sm font-medium text-white transition-smooth hover:bg-[#1B2E3B] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isGenerating ? "Generating..." : "Try again"}
+            </button>
+          </div>
+        ) : null}
+        {!payload.body.trim() && !showEditForm && !showFallbackError ? (
           <div className="rounded-relay-control border border-dashed border-[var(--border)] bg-white/80 p-4">
             <p className="text-sm text-[#3F5363]">Reply not generated yet.</p>
             <button
@@ -149,7 +171,7 @@ function DraftEmailReview({
             </button>
           </div>
         ) : null}
-        {payload.body.trim() && !showEditForm ? (
+        {payload.body.trim() && !showEditForm && !showFallbackError ? (
           <div className="flex items-center justify-between gap-3 rounded-relay-control border border-[var(--border)] bg-white/75 px-3 py-2">
             <p className="text-xs text-[#61707D]">
               {action.personalization?.generation?.cacheStatus === "cached"
@@ -168,56 +190,60 @@ function DraftEmailReview({
             </button>
           </div>
         ) : null}
-        <div>
-          <p className="text-xs text-[#3F5363] mb-0.5">To: {payload.to}</p>
-          {showEditForm && !readOnly ? (
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20"
-              placeholder="Subject"
-            />
-        ) : (
-          <p className="font-medium text-[#1B2E3B]">{subject}</p>
-          )}
-        </div>
-        {showEditForm && !readOnly ? (
-          <div>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={6}
-              className="w-full rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20 resize-y"
-              placeholder="Email body"
-            />
-            <div className="mt-2 flex gap-2">
-              <button
-                type="button"
-                onClick={handleSave}
-                className="rounded-relay-control bg-[#213443] px-3 py-1.5 text-sm font-medium text-white transition-smooth hover:bg-[#1B2E3B]"
-              >
-                Save changes
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="rounded-relay-control border border-[var(--border)] px-3 py-1.5 text-sm text-[#3F5363] transition-smooth hover:bg-[#e8edf3]"
-              >
-                Cancel
-              </button>
+        {!showFallbackError ? (
+          <>
+            <div>
+              <p className="text-xs text-[#3F5363] mb-0.5">To: {payload.to}</p>
+              {showEditForm && !readOnly ? (
+                <input
+                  type="text"
+                  value={subject}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="w-full rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20"
+                  placeholder="Subject"
+                />
+              ) : (
+                <p className="font-medium text-[#1B2E3B]">{subject}</p>
+              )}
             </div>
-          </div>
-        ) : (
-          <p
-            data-testid="draft-email-body"
-            className="text-sm text-[#314555] whitespace-pre-wrap"
-          >
-            {body}
-          </p>
-        )}
+            {showEditForm && !readOnly ? (
+              <div>
+                <textarea
+                  value={body}
+                  onChange={(e) => setBody(e.target.value)}
+                  rows={6}
+                  className="w-full rounded-relay-control border border-[var(--border)] bg-white px-3 py-2 text-sm text-[#1B2E3B] focus:outline-none focus:ring-2 focus:ring-[#213443]/20 resize-y"
+                  placeholder="Email body"
+                />
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSave}
+                    className="rounded-relay-control bg-[#213443] px-3 py-1.5 text-sm font-medium text-white transition-smooth hover:bg-[#1B2E3B]"
+                  >
+                    Save changes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="rounded-relay-control border border-[var(--border)] px-3 py-1.5 text-sm text-[#3F5363] transition-smooth hover:bg-[#e8edf3]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p
+                data-testid="draft-email-body"
+                className="text-sm text-[#314555] whitespace-pre-wrap"
+              >
+                {body}
+              </p>
+            )}
+          </>
+        ) : null}
       </div>
-      {!showEditForm && !readOnly && onEdit && (
+      {!showEditForm && !readOnly && onEdit && !showFallbackError && (
         <button
           type="button"
           onClick={() => setLocalEditing(true)}

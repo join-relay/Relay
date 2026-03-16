@@ -8,6 +8,7 @@ import { ActionCard } from "@/components/actions/ActionCard"
 import {
   ACTIONS_QUERY_KEY,
   BRIEFING_QUERY_KEY,
+  HISTORY_ACTIONS_QUERY_KEY,
   LIVE_REFRESH_INTERVAL_MS,
   fetchActions,
 } from "@/lib/client/dashboard-queries"
@@ -117,6 +118,7 @@ export default function ActionsPage() {
             : current
       )
       queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: HISTORY_ACTIONS_QUERY_KEY })
     },
   })
   const rejectMutation = useMutation({
@@ -130,6 +132,7 @@ export default function ActionsPage() {
             : current
       )
       queryClient.invalidateQueries({ queryKey: ACTIONS_QUERY_KEY })
+      queryClient.invalidateQueries({ queryKey: HISTORY_ACTIONS_QUERY_KEY })
     },
   })
   const editMutation = useMutation({

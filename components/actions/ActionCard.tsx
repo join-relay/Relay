@@ -353,11 +353,6 @@ export function ActionCard({
                   : "Saved preferences"}
               </span>
             )}
-            {action.personalization?.generation?.source === "deterministic_fallback" && (
-              <span className="rounded-relay-control border border-[var(--border)] bg-white/80 px-2 py-1 text-[#314555]">
-                Fallback draft
-              </span>
-            )}
           </div>
 
           {action.originalContext && (
