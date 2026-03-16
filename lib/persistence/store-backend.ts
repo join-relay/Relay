@@ -6,7 +6,7 @@ import path from "node:path"
 const STORE_DIR = path.join(process.cwd(), ".relay")
 const KV_PREFIX = "relay:"
 
-function useKv(): boolean {
+function isKvConfigured(): boolean {
   const url = process.env.KV_REST_API_URL ?? process.env.KV_URL
   const token = process.env.KV_REST_API_TOKEN
   return Boolean(typeof url === "string" && url.trim() && typeof token === "string" && token.trim())
@@ -16,7 +16,7 @@ function useKv(): boolean {
  * Get store data by name. On Vercel (when KV_* env is set) uses Vercel KV; otherwise uses .relay/<name>.json.
  */
 export async function getStore(name: string): Promise<unknown> {
-  if (useKv()) {
+  if (isKvConfigured()) {
     try {
       const { kv } = await import("@vercel/kv")
       const key = `${KV_PREFIX}${name}`
@@ -44,7 +44,7 @@ export async function getStore(name: string): Promise<unknown> {
  * Set store data by name. On Vercel uses KV; otherwise writes to .relay/<name>.json.
  */
 export async function setStore(name: string, value: unknown): Promise<void> {
-  if (useKv()) {
+  if (isKvConfigured()) {
     try {
       const { kv } = await import("@vercel/kv")
       const key = `${KV_PREFIX}${name}`

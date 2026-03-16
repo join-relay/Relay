@@ -45,10 +45,10 @@ export default function TermsPage() {
               Disclaimer
             </h2>
             <p className="mt-2 text-[15px] leading-relaxed">
-              Relay is provided "as is." AI outputs may be inaccurate or inappropriate; always
+              Relay is provided &ldquo;as is.&rdquo; AI outputs may be inaccurate or inappropriate; always
               review before sending or acting. We do not guarantee availability, accuracy, or
               fitness for a particular purpose. We are not liable for decisions you make based
-              on Relay's suggestions.
+              on Relay&apos;s suggestions.
             </p>
           </div>
 
@@ -58,7 +58,7 @@ export default function TermsPage() {
             </h2>
             <p className="mt-2 text-[15px] leading-relaxed">
               We may update these terms from time to time. Continued use of Relay after
-              changes constitutes acceptance. The "Last updated" date at the top reflects the
+              changes constitutes acceptance. The &ldquo;Last updated&rdquo; date at the top reflects the
               latest revision.
             </p>
           </div>

@@ -56,7 +56,7 @@ export default function PrivacyPage() {
               Your choices
             </h2>
             <p className="mt-2 text-[15px] leading-relaxed">
-              You can revoke Relay's access at any time via your Google account settings or by
+              You can revoke Relay&apos;s access at any time via your Google account settings or by
               disconnecting within Relay. Deleting your account or revoking access will stop
               further use of your data; existing backups may be retained as required by law or
               operational need.
