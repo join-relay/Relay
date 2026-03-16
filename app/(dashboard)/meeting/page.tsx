@@ -2,7 +2,7 @@
 
 import { useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { BRIEFING_QUERY_KEY } from "@/lib/client/dashboard-queries"
+import { BRIEFING_QUERY_KEY, fetchBriefing } from "@/lib/client/dashboard-queries"
 import { JoinValidationPanel } from "@/components/meeting/JoinValidationPanel"
 import { MeetingPageHeader } from "@/components/meeting/MeetingPageHeader"
 import type {
@@ -270,6 +270,13 @@ export default function MeetingPage() {
     queryKey: ["meeting-upcoming-status"],
     queryFn: fetchUpcomingStatus,
   })
+  const { data: briefing } = useQuery({
+    queryKey: BRIEFING_QUERY_KEY,
+    queryFn: fetchBriefing,
+    staleTime: 30_000,
+  })
+  const suggestedFromEmail =
+    briefing?.calendarSummary?.suggestedFromEmail?.filter((e) => Boolean(e.meetUrl)) ?? []
 
   const joinMutation = useMutation({
     mutationFn: checkMeetReadiness,
@@ -459,6 +466,37 @@ export default function MeetingPage() {
               </p>
             )}
           </div>
+
+          {suggestedFromEmail.length > 0 && (
+            <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+              <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+                Suggested from your emails
+              </h2>
+              <p className="mt-1 text-xs text-[#61707D]">
+                These were parsed from pending emails. Add them from the Actions tab to put them on your calendar.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {suggestedFromEmail.map((event) => (
+                  <li key={event.actionId} className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm">
+                    <span className="font-medium text-[#1B2E3B]">{event.title}</span>
+                    <span className="ml-1 text-[#3F5363]">
+                      {formatEventTime(event.start, event.end)}
+                    </span>
+                    {event.meetUrl && (
+                      <a
+                        href={event.meetUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 block truncate text-[#213443] underline hover:no-underline"
+                      >
+                        {event.meetUrl}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {status.activeRecallRun?.artifactMetadata?.recordingUrl && (
             <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">

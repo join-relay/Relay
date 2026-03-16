@@ -12,6 +12,12 @@ function getApiKey(): string | null {
   return key && key.length > 0 ? key : null
 }
 
+const MEET_URL_REGEX = /https:\/\/meet\.google\.com\/[a-z-]+/i
+function extractMeetUrl(text: string): string | undefined {
+  const match = text.match(MEET_URL_REGEX)
+  return match ? match[0] : undefined
+}
+
 /**
  * Extract a single proposed meeting from email content (e.g. "let's meet Tuesday at 3pm").
  * Returns one ProposedCalendarEvent or null. Uses OpenAI when API key is set.
@@ -83,6 +89,8 @@ If no clear proposed meeting time, output null.`,
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null
     if (endDate.getTime() <= startDate.getTime()) return null
 
+    const meetUrl = extractMeetUrl(text)
+
     return {
       id: randomUUID(),
       title,
@@ -93,6 +101,7 @@ If no clear proposed meeting time, output null.`,
           ? o.confidence
           : "medium",
       rawPhrase: typeof o.rawPhrase === "string" ? o.rawPhrase : undefined,
+      meetUrl: meetUrl ?? undefined,
     }
   } catch {
     return null

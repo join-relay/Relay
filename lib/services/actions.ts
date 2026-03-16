@@ -136,6 +136,11 @@ const GENERIC_REPLY_TOKENS = new Set([
   "will",
   "work",
   "works",
+  "added",
+  "calendar",
+  "see",
+  "then",
+  "there",
 ])
 
 function parseCalendarSourceIdentifiers(compositeId: string): ActionSourceIdentifiers {
@@ -994,7 +999,8 @@ function generatedBodyLooksGrounded(params: {
     (token) => !contextTokenSet.has(token) && !GENERIC_REPLY_TOKENS.has(token)
   )
 
-  if (openingTokens.length > 0 && openingOverlap === 0 && contextTokens.length > 5) {
+  // Only reject when the opening sentence has several non-generic tokens but zero overlap (avoid rejecting short polite openings like "That works!")
+  if (openingTokens.length >= 3 && openingOverlap === 0 && contextTokens.length > 5) {
     return false
   }
 

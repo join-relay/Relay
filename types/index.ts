@@ -467,6 +467,8 @@ export interface ProposedCalendarEvent {
   description?: string
   confidence?: "high" | "medium" | "low"
   rawPhrase?: string
+  /** Google Meet link parsed from the email (e.g. https://meet.google.com/xxx). */
+  meetUrl?: string
 }
 
 /**

@@ -20,6 +20,7 @@ export async function POST(request: NextRequest) {
     calendarId?: string
     runBotId?: string
     proposedEventId?: string
+    meetUrl?: string
   }
   try {
     body = await request.json()
@@ -27,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
   }
 
-  const { title, start, end, description, location, calendarId, runBotId, proposedEventId } = body
+  const { title, start, end, description, location, calendarId, runBotId, proposedEventId, meetUrl } = body
   if (typeof title !== "string" || !title.trim() || typeof start !== "string" || typeof end !== "string") {
     return NextResponse.json(
       { error: "title, start, and end are required" },
@@ -35,12 +36,19 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const descriptionWithMeet =
+    typeof meetUrl === "string" && meetUrl.trim().length > 0
+      ? [typeof description === "string" ? description.trim() : "", `Meet: ${meetUrl.trim()}`]
+          .filter(Boolean)
+          .join("\n\n")
+      : typeof description === "string" ? description : undefined
+
   try {
     const result = await createCalendarEvent(session.user.email, {
       title: title.trim(),
       start,
       end,
-      description: typeof description === "string" ? description : undefined,
+      description: descriptionWithMeet,
       location: typeof location === "string" ? location : undefined,
       calendarId: typeof calendarId === "string" ? calendarId : undefined,
     })

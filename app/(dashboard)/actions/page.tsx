@@ -171,6 +171,7 @@ export default function ActionsPage() {
         start: event.start,
         end: event.end,
         description: event.description,
+        meetUrl: event.meetUrl,
       }),
     })
     if (!res.ok) {
