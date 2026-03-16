@@ -274,8 +274,13 @@ export async function getMeetingReadinessStatus(): Promise<MeetingReadinessStatu
       " "
     )}, ${customization.meetingTone}, ${customization.meetingFormality}, and ${customization.meetingConciseness}.`,
     summarySurface: {
-      state: hasUpcomingMeeting ? "pending" : "empty",
-      summary: null,
+      state:
+        activeRecallRun?.summary != null
+          ? "available"
+          : hasUpcomingMeeting
+            ? "pending"
+            : "empty",
+      summary: activeRecallRun?.summary ?? null,
     },
     actionItemsSurface: {
       state: hasUpcomingMeeting ? "pending" : "empty",

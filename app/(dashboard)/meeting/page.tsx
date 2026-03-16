@@ -97,7 +97,7 @@ async function createRecallBot(meetingUrl: string) {
   const response = await fetch("/api/meeting/providers/recall/bot", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ meetingUrl, botName: "Relay" }),
+    body: JSON.stringify({ meetingUrl }),
   })
   const body = await response.json().catch(() => ({}))
   if (!response.ok) {
@@ -175,7 +175,8 @@ export default function MeetingPage() {
   const lastJoinAttempt = joinMutation.data ?? status.lastLinkCheck
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-testid="meeting-resolution-state" data-resolution-state={status.resolutionState}>
+      <span className="sr-only">{status.resolutionState}</span>
       <div className="animate-relay-fade-in">
         <MeetingPageHeader
           preparedCount={preparedCount}
@@ -352,11 +353,32 @@ export default function MeetingPage() {
             )}
           </div>
 
+          {status.activeRecallRun?.artifactMetadata?.recordingUrl && (
+            <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+              <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+                Meeting recording
+              </h2>
+              <p className="mt-1 text-xs text-[#61707D]">
+                Recording is available after the bot leaves the call. Link expires in about 5 hours.
+              </p>
+              <div className="mt-3 rounded-relay-inner overflow-hidden border border-[var(--border)] bg-black/5">
+                <video
+                  src={status.activeRecallRun.artifactMetadata.recordingUrl}
+                  controls
+                  className="w-full max-h-[360px]"
+                  playsInline
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Meeting summary
             </h2>
-            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
+            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363] whitespace-pre-wrap">
               {status.summarySurface.summary ??
                 "No meeting summary is available yet. This panel is ready for future Google Meet summary artifacts or manual fallback summaries."}
             </div>

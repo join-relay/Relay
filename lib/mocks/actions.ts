@@ -226,7 +226,6 @@ function getActionSourceFingerprint(action: StoredPendingAction): string {
         action.provenance.sourceIdentifiers?.gmailMessageId ??
         threadContext?.messages.at(-1)?.id ??
         "",
-      preview: action.originalContext?.preview ?? "",
     })
   }
 

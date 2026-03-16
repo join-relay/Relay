@@ -32,6 +32,7 @@ function decodeHtmlEntities(value?: string | null) {
     .replace(/&apos;/gi, "'")
     .replace(/&quot;/gi, '"')
     .replace(/&nbsp;/gi, " ")
+    .replace(/&zwnj;/gi, "")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
@@ -86,7 +87,14 @@ function decodeBase64Url(value?: string | null) {
 export function normalizeEmailTextForDisplay(value?: string | null) {
   if (!value) return ""
   const decoded = decodeHtmlEntities(value)
-  return decoded.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ").trim()
+  return decoded
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, " ")
+    .replace(/\u200C/g, "")
+    .replace(/\u200B/g, "")
+    .replace(/\u200D/g, "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim()
 }
 
 function stripHtml(html: string) {

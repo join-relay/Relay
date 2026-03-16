@@ -138,6 +138,7 @@ export function buildRecallBotCreatePayload(input: RecallBotCreateRequest): Reco
         },
       },
     },
+    video_mixed_mp4: {},
   }
 
   const avatarUrl = getPublicBaseUrl()
@@ -207,6 +208,40 @@ export async function createRecallBot(
     }
   } catch (err) {
     console.warn("[recall] create bot error:", err)
+    return null
+  }
+}
+
+/**
+ * Fetch the recording video URL for a completed bot from Recall API.
+ * Call after receiving bot.done or bot.call_ended. URL is pre-signed and expires (e.g. 5 hours).
+ */
+export async function fetchRecallBotRecordingUrl(botId: string): Promise<string | null> {
+  ensureRecallEnvLoaded()
+  const apiKey = process.env.RECALL_API_KEY?.trim()
+  if (!apiKey || !botId) return null
+  let baseUrl = getRecallApiBaseUrl().replace(/\/$/, "")
+  if (!baseUrl.endsWith("/api/v1")) baseUrl = `${baseUrl}/api/v1`
+  const url = `${baseUrl}/bot/${encodeURIComponent(botId)}/`
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { Authorization: `Token ${apiKey}` },
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as Record<string, unknown>
+    const recordings = data.recordings as Array<{
+      media_shortcuts?: {
+        video_mixed?: {
+          data?: { download_url?: string }
+        }
+      }
+    }> | undefined
+    const first = Array.isArray(recordings) ? recordings[0] : undefined
+    const urlStr = first?.media_shortcuts?.video_mixed?.data?.download_url
+    return typeof urlStr === "string" && urlStr.length > 0 ? urlStr : null
+  } catch (err) {
+    console.warn("[recall] fetch bot recording error:", err)
     return null
   }
 }

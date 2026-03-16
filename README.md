@@ -112,8 +112,8 @@ Set required values in .env.local:
 Optional but recommended:
 
 - OPENAI_API_KEY
-- OPENAI_REASONING_MODEL (default: gpt-5-mini)
-- OPENAI_HEAVY_REASONING_MODEL (default: gpt-5.4)
+- OPENAI_REASONING_MODEL (default: gpt-4o-mini)
+- OPENAI_HEAVY_REASONING_MODEL (default: gpt-4o-mini)
 - RECALL_API_KEY
 - RECALL_WEBHOOK_SECRET
 - RECALL_API_BASE_URL

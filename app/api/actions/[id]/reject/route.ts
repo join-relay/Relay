@@ -3,10 +3,12 @@ import { rejectAction } from "@/lib/services/actions"
 
 export async function POST(
   _req: Request,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   try {
-    const { id } = await params
+    const { id } = typeof (params as Promise<{ id: string }>).then === "function"
+      ? await (params as Promise<{ id: string }>)
+      : (params as { id: string })
     const updated = await rejectAction(id)
     if (!updated) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 })

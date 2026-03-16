@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyRecallWebhook } from "@/lib/recall/verify-webhook"
+import { fetchRecallBotRecordingUrl } from "@/lib/services/recall"
+import { generateMeetingSummary } from "@/lib/services/meeting-summary"
 import {
   appendTranscriptToRun,
+  getMeetingRunByBotId,
   updateMeetingRunByBotId,
 } from "@/lib/persistence/meeting-runs"
 import type { RecallTranscriptEntry } from "@/types"
@@ -98,6 +101,21 @@ export async function POST(request: NextRequest) {
       status: runStatus,
       providerError: event === "bot.fatal" ? providerError : undefined,
     })
+
+    if (runStatus === "completed" && (event === "bot.call_ended" || event === "bot.done")) {
+      const recordingUrl = await fetchRecallBotRecordingUrl(botId)
+      const run = await getMeetingRunByBotId(botId)
+      const entries = (run?.transcriptEntries ?? []) as RecallTranscriptEntry[]
+      const summary = entries.length > 0 ? await generateMeetingSummary(entries) : null
+      await updateMeetingRunByBotId(botId, {
+        artifactMetadata: {
+          recordingUrl: recordingUrl ?? undefined,
+          recordingSource: recordingUrl ? "recall_recording" : undefined,
+        },
+        summary: summary ?? null,
+      })
+    }
+
     return NextResponse.json({ received: true }, { status: 200 })
   }
 

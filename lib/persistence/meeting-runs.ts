@@ -49,6 +49,7 @@ function normalizeRun(raw: unknown): MeetingRunRecord | null {
     updatedAt: r.updatedAt,
     artifactMetadata,
     transcriptEntries,
+    summary: typeof r.summary === "string" ? r.summary : r.summary === null ? null : undefined,
   }
 }
 
@@ -100,14 +101,32 @@ export async function upsertMeetingRun(
 
 export async function updateMeetingRunByBotId(
   botId: string,
-  patch: Partial<Pick<MeetingRunRecord, "status" | "providerStatus" | "providerError" | "updatedAt">>
+  patch: Partial<
+    Pick<
+      MeetingRunRecord,
+      "status" | "providerStatus" | "providerError" | "updatedAt" | "summary"
+    > & {
+      artifactMetadata?: Partial<MeetingRunRecord["artifactMetadata"]>
+    }
+  >
 ): Promise<MeetingRunRecord | null> {
   const runs = await readAll()
   const index = runs.findIndex((r) => r.botId === botId)
   if (index < 0) return null
-  const updated = {
-    ...runs[index],
-    ...patch,
+  const existing = runs[index]
+  const { artifactMetadata: metaPatch, ...rest } = patch
+  const baseMeta = existing.artifactMetadata ?? {
+    transcriptSource: "none" as const,
+    recordingSource: "none" as const,
+    transcriptEntries: (existing.transcriptEntries ?? []).length,
+  }
+  const artifactMetadata = metaPatch
+    ? ({ ...baseMeta, ...metaPatch } as MeetingRunRecord["artifactMetadata"])
+    : undefined
+  const updated: MeetingRunRecord = {
+    ...existing,
+    ...rest,
+    ...(artifactMetadata ? { artifactMetadata } : {}),
     updatedAt: patch.updatedAt ?? new Date().toISOString(),
   }
   runs[index] = updated

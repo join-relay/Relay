@@ -677,8 +677,11 @@ function buildSignOff(
     .filter(Boolean) ?? []
   const signatureStartsWithSignOff = signatureLines.length > 0 && isSignOffLine(signatureLines[0])
 
+  const signOffFromSignature =
+    signatureLines.length > 0 && isSignOffLine(signatureLines[0]) ? signatureLines[0] : null
   if (settings.includeSignOff && !signatureStartsWithSignOff) {
     const signOff =
+      signOffFromSignature ||
       explicitSignOffExample ||
       styleProfile.styleAnchors.closingLineExamples?.[0]?.trim()
     if (signOff) {

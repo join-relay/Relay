@@ -442,6 +442,8 @@ export interface MeetingRunRecord {
   artifactMetadata?: RecallArtifactMetadata
   /** Stored transcript utterances from webhook events. */
   transcriptEntries?: RecallTranscriptEntry[]
+  /** Post-meeting summary generated when the bot completes (from transcript). */
+  summary?: string | null
 }
 
 /**

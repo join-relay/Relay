@@ -27,12 +27,12 @@ If `OPENAI_API_KEY` is missing in the Vercel project, the app uses **determinist
 
 The app uses the OpenAI **Responses API** and reads the model from env:
 
-- `OPENAI_REASONING_MODEL` (default in code: `gpt-5-mini`)
-- `OPENAI_HEAVY_REASONING_MODEL` (default: `gpt-5.4`)
+- `OPENAI_REASONING_MODEL` (default in code: `gpt-4o-mini`)
+- `OPENAI_HEAVY_REASONING_MODEL` (default: `gpt-4o-mini`)
 
 If your OpenAI account or region doesn’t support these, the API can return an error. Check runtime logs for messages like `OpenAI request failed (400): ...` or `model not found`.
 
-**Fix:** Set env to a model your account supports (e.g. `o1-mini`, `o1` if you use the Responses API). See [OpenAI API docs](https://platform.openai.com/docs) for current model IDs.
+**Fix:** Set env to a model your account supports (e.g. `gpt-4o-mini`, `gpt-4o`). See [OpenAI API docs](https://platform.openai.com/docs) for current model IDs.
 
 ### 3. **Response format mismatch (usage goes up but you see fallback)**
 

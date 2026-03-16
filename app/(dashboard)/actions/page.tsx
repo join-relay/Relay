@@ -168,13 +168,14 @@ export default function ActionsPage() {
   const pendingActions = actions.filter((a) => a.status === "pending")
   const urgentCount = pendingActions.filter((a) => a.urgency === "urgent").length
   const conflictCount = pendingActions.filter((a) => a.type === "reschedule_meeting").length
+  const pendingOnly = actions.filter((a) => a.status === "pending")
   const orderedActions = focusedActionId
     ? [...actions].sort((left, right) => {
         if (left.id === focusedActionId) return -1
         if (right.id === focusedActionId) return 1
         return 0
       })
-    : actions
+    : pendingOnly
 
   if (isLoading) {
     return (
@@ -212,7 +213,7 @@ export default function ActionsPage() {
         />
       </div>
       <div className="space-y-4 animate-relay-fade-in opacity-0 [animation-delay:75ms] [animation-fill-mode:forwards]">
-        {actions.length === 0 ? (
+        {pendingOnly.length === 0 ? (
           <div className="rounded-relay-card bg-white/80 backdrop-blur-sm border border-[var(--border)] p-8 text-center shadow-relay-soft">
             <p className="text-[#3F5363]">No actions to review</p>
           </div>

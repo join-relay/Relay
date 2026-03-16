@@ -14,8 +14,8 @@ import type {
 } from "@/types"
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
-const DEFAULT_REASONING_MODEL = "gpt-5-mini"
-const DEFAULT_HEAVY_REASONING_MODEL = "gpt-5.4"
+const DEFAULT_REASONING_MODEL = "gpt-4o-mini"
+const DEFAULT_HEAVY_REASONING_MODEL = "gpt-4o-mini"
 
 type RankedAction = {
   threadId: string
