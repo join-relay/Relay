@@ -126,7 +126,13 @@ export async function updateMeetingRunByBotId(
   patch: Partial<
     Pick<
       MeetingRunRecord,
-      "status" | "providerStatus" | "providerError" | "updatedAt" | "summary" | "proposedCalendarEvents"
+      | "status"
+      | "providerStatus"
+      | "providerError"
+      | "updatedAt"
+      | "summary"
+      | "proposedCalendarEvents"
+      | "transcriptEntries"
     > & {
       artifactMetadata?: Partial<MeetingRunRecord["artifactMetadata"]>
     }
@@ -145,10 +151,17 @@ export async function updateMeetingRunByBotId(
   const artifactMetadata = metaPatch
     ? ({ ...baseMeta, ...metaPatch } as MeetingRunRecord["artifactMetadata"])
     : undefined
+  const transcriptEntries = patch.transcriptEntries !== undefined ? patch.transcriptEntries : existing.transcriptEntries
+  const mergedMeta: MeetingRunRecord["artifactMetadata"] = {
+    ...baseMeta,
+    ...artifactMetadata,
+    transcriptEntries: (transcriptEntries ?? []).length,
+  }
   const updated: MeetingRunRecord = {
     ...existing,
     ...rest,
-    ...(artifactMetadata ? { artifactMetadata } : {}),
+    transcriptEntries,
+    artifactMetadata: mergedMeta,
     updatedAt: patch.updatedAt ?? new Date().toISOString(),
   }
   runs[index] = updated

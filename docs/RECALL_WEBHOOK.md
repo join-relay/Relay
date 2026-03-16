@@ -17,7 +17,7 @@ If the bot joins the call on Recall and you see the transcript and video on [rec
    - In Recall’s webhook settings, set the same value as the signing secret.  
    Relay uses it to verify that requests are from Recall.
 
-After saving, new bot runs will send `bot.*` and `transcript.data` events to Relay. The Meeting page will then show status, live transcript, and (after the call ends) recording and summary.
+After saving, subscribe to **bot** and **transcript** (including `transcript.data`). New bot runs will then send events to Relay; the Meeting page will show status, live transcript, and (after the call ends) recording and summary. If the bot finishes but transcript/summary stay empty, confirm the webhook is subscribed to transcript events and that the same deployment that created the bot receives the webhook (e.g. Vercel KV stores runs so all instances see them).
 
 ## If it still doesn’t update
 

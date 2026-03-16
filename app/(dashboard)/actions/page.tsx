@@ -7,6 +7,7 @@ import { ActionsPageHeader } from "@/components/actions/ActionsPageHeader"
 import { ActionCard } from "@/components/actions/ActionCard"
 import {
   ACTIONS_QUERY_KEY,
+  BRIEFING_QUERY_KEY,
   LIVE_REFRESH_INTERVAL_MS,
   fetchActions,
 } from "@/lib/client/dashboard-queries"
@@ -191,6 +192,7 @@ export default function ActionsPage() {
             }
             : current
     )
+    queryClient.invalidateQueries({ queryKey: BRIEFING_QUERY_KEY })
   }
 
   function dismissEmailCalendarEvent(actionId: string) {

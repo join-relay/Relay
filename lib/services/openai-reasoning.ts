@@ -14,8 +14,15 @@ import type {
 } from "@/types"
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses"
+const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions"
 const DEFAULT_REASONING_MODEL = "gpt-4o-mini"
 const DEFAULT_HEAVY_REASONING_MODEL = "gpt-4o-mini"
+
+/** Models that support the Responses API reasoning.effort parameter (e.g. o1, o3-mini). */
+function modelSupportsReasoning(model: string): boolean {
+  const m = model.toLowerCase()
+  return /^o1(-|$)/i.test(m) || /^o3-mini/i.test(m) || /^gpt-5/i.test(m)
+}
 
 type RankedAction = {
   threadId: string
@@ -208,6 +215,30 @@ function deepFindTextOrBody(value: unknown, minLen = 40): string | null {
   return null
 }
 
+async function requestJsonWithChat<T>(prompt: string, model: string, apiKey: string): Promise<string> {
+  const res = await fetch(OPENAI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user" as const, content: prompt }],
+      response_format: { type: "json_object" as const },
+      max_tokens: 2048,
+    }),
+  })
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } }
+  if (!res.ok) {
+    const msg = data?.error?.message ?? "OpenAI request failed"
+    throw new Error(`OpenAI request failed (${res.status}): ${msg}`)
+  }
+  const text = data.choices?.[0]?.message?.content?.trim()
+  if (!text) throw new Error("OpenAI returned no text output")
+  return text
+}
+
 async function requestJson<T>(
   prompt: string,
   options?: {
@@ -222,54 +253,50 @@ async function requestJson<T>(
   const apiKey = getApiKey()
   if (!apiKey) return null
   const model = getReasoningModel(options?.modelKind ?? "default")
-  const requestBody = {
-    model,
-    reasoning: { effort: options?.effort ?? "low" },
-    input: [
-      {
-        role: "user",
-        content: [{ type: "input_text", text: prompt }],
-      },
-    ],
-  }
-  options?.debug?.onRequest?.(requestBody)
+  const useReasoning = modelSupportsReasoning(model)
 
-  const response = await fetch(OPENAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
+  if (useReasoning) {
+    const requestBody = {
+      model,
+      reasoning: { effort: options?.effort ?? "low" },
+      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
+    }
+    options?.debug?.onRequest?.(requestBody)
+    const response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(requestBody),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (response.ok) {
+      const text = extractOutputText(body)
+      options?.debug?.onResponse?.({ ok: true, status: response.status, outputText: text })
+      if (text) {
+        try {
+          return parseJsonResponse<T>(text)
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "OpenAI returned invalid JSON output"
+          console.error("[OpenAI] parse error:", message, clipErrorText(text))
+          throw new Error(`${message}: ${clipErrorText(text)}`)
+        }
+      }
+    }
     const message =
       body && typeof body === "object" && "error" in body
         ? String((body as { error?: { message?: string } }).error?.message ?? "OpenAI request failed")
         : "OpenAI request failed"
+    if (response.status === 400 && /reasoning|effort|not supported/i.test(message)) {
+      options?.debug?.onResponse?.({ ok: false, status: response.status, error: message })
+      const text = await requestJsonWithChat(prompt, model, apiKey)
+      return parseJsonResponse<T>(text) as T
+    }
     console.error("[OpenAI] request failed:", response.status, message)
-    options?.debug?.onResponse?.({
-      ok: response.ok,
-      status: response.status,
-      error: message,
-    })
+    options?.debug?.onResponse?.({ ok: false, status: response.status, error: message })
     throw new Error(`OpenAI request failed (${response.status}): ${message}`)
   }
 
-  const text = extractOutputText(body)
-  options?.debug?.onResponse?.({
-    ok: response.ok,
-    status: response.status,
-    outputText: text,
-  })
-  if (!text) {
-    const keys = body && typeof body === "object" ? Object.keys(body as object).join(", ") : "no body"
-    console.error("[OpenAI] no text output in response; top-level keys:", keys)
-    throw new Error("OpenAI returned no text output")
-  }
-
+  const text = await requestJsonWithChat(prompt, model, apiKey)
+  options?.debug?.onResponse?.({ ok: true, status: 200, outputText: text })
   try {
     return parseJsonResponse<T>(text)
   } catch (error) {
@@ -277,6 +304,29 @@ async function requestJson<T>(
     console.error("[OpenAI] parse error:", message, clipErrorText(text))
     throw new Error(`${message}: ${clipErrorText(text)}`)
   }
+}
+
+async function requestTextWithChat(prompt: string, model: string, apiKey: string): Promise<string> {
+  const res = await fetch(OPENAI_CHAT_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: "user" as const, content: prompt }],
+      max_tokens: 2048,
+    }),
+  })
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } }
+  if (!res.ok) {
+    const msg = data?.error?.message ?? "OpenAI request failed"
+    throw new Error(`OpenAI request failed (${res.status}): ${msg}`)
+  }
+  const text = data.choices?.[0]?.message?.content?.trim()
+  if (!text) throw new Error("OpenAI returned no text output")
+  return text
 }
 
 async function requestText(
@@ -293,54 +343,42 @@ async function requestText(
   const apiKey = getApiKey()
   if (!apiKey) return null
   const model = getReasoningModel(options?.modelKind ?? "default")
-  const requestBody = {
-    model,
-    reasoning: { effort: options?.effort ?? "low" },
-    input: [
-      {
-        role: "user",
-        content: [{ type: "input_text", text: prompt }],
-      },
-    ],
-  }
-  options?.debug?.onRequest?.(requestBody)
+  const useReasoning = modelSupportsReasoning(model)
 
-  const response = await fetch(OPENAI_RESPONSES_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(requestBody),
-  })
-
-  const body = await response.json().catch(() => ({}))
-  if (!response.ok) {
+  if (useReasoning) {
+    const requestBody = {
+      model,
+      reasoning: { effort: options?.effort ?? "low" },
+      input: [{ role: "user", content: [{ type: "input_text", text: prompt }] }],
+    }
+    options?.debug?.onRequest?.(requestBody)
+    const response = await fetch(OPENAI_RESPONSES_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify(requestBody),
+    })
+    const body = await response.json().catch(() => ({}))
+    if (response.ok) {
+      const text = extractOutputText(body).trim()
+      options?.debug?.onResponse?.({ ok: true, status: response.status, outputText: text })
+      if (text) return { text, model }
+    }
     const message =
       body && typeof body === "object" && "error" in body
         ? String((body as { error?: { message?: string } }).error?.message ?? "OpenAI request failed")
         : "OpenAI request failed"
+    if (response.status === 400 && /reasoning|effort|not supported/i.test(message)) {
+      options?.debug?.onResponse?.({ ok: false, status: response.status, error: message })
+      const text = await requestTextWithChat(prompt, model, apiKey)
+      return { text, model }
+    }
     console.error("[OpenAI] request failed:", response.status, message)
-    options?.debug?.onResponse?.({
-      ok: response.ok,
-      status: response.status,
-      error: message,
-    })
+    options?.debug?.onResponse?.({ ok: false, status: response.status, error: message })
     throw new Error(`OpenAI request failed (${response.status}): ${message}`)
   }
 
-  const text = extractOutputText(body).trim()
-  options?.debug?.onResponse?.({
-    ok: response.ok,
-    status: response.status,
-    outputText: text,
-  })
-  if (!text) {
-    const keys = body && typeof body === "object" ? Object.keys(body as object).join(", ") : "no body"
-    console.error("[OpenAI] no text output in response (requestText); top-level keys:", keys)
-    throw new Error("OpenAI returned no text output")
-  }
-
+  const text = await requestTextWithChat(prompt, model, apiKey)
+  options?.debug?.onResponse?.({ ok: true, status: 200, outputText: text })
   return { text, model }
 }
 

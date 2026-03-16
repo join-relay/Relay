@@ -20,15 +20,10 @@ export function MeetingPageHeader({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[#1B2E3B]">
-              Google Meet readiness
+              Meeting
             </h1>
             <p className="mt-0.5 text-sm text-[#3F5363]">
-              Relay is now Google-first for upcoming Meet detection and honest fallback states.
-            </p>
-            <p className="mt-3 max-w-2xl text-sm text-[#314555]">
-              Relay will only report validated milestones for {botLabel}.
-              This page shows what is live from Google auth and Calendar today,
-              and what still remains intentionally unimplemented.
+              Join with a bot, see upcoming Meets, and view transcript and summary when ready.
             </p>
           </div>
           <div className="flex gap-6 shrink-0">

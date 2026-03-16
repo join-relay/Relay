@@ -212,36 +212,77 @@ export async function createRecallBot(
   }
 }
 
-/**
- * Fetch the recording video URL for a completed bot from Recall API.
- * Call after receiving bot.done or bot.call_ended. URL is pre-signed and expires (e.g. 5 hours).
- */
-export async function fetchRecallBotRecordingUrl(botId: string): Promise<string | null> {
+type RecallBotRecordings = Array<{
+  media_shortcuts?: {
+    video_mixed?: { data?: { download_url?: string } }
+    transcript?: { data?: { download_url?: string } }
+  }
+}>
+
+/** Fetch bot by ID and return recordings (media_shortcuts). */
+export async function fetchRecallBotRecordings(botId: string): Promise<RecallBotRecordings | null> {
   ensureRecallEnvLoaded()
   const apiKey = process.env.RECALL_API_KEY?.trim()
   if (!apiKey || !botId) return null
-  let baseUrl = getRecallApiBaseUrl().replace(/\/$/, "")
-  if (!baseUrl.endsWith("/api/v1")) baseUrl = `${baseUrl}/api/v1`
-  const url = `${baseUrl}/bot/${encodeURIComponent(botId)}/`
+  const baseUrl = getRecallApiBaseUrl().replace(/\/$/, "")
+  const apiBase = baseUrl.endsWith("/api/v1") ? baseUrl : `${baseUrl}/api/v1`
   try {
-    const res = await fetch(url, {
+    const res = await fetch(`${apiBase}/bot/${encodeURIComponent(botId)}/`, {
       method: "GET",
       headers: { Authorization: `Token ${apiKey}` },
     })
     if (!res.ok) return null
     const data = (await res.json()) as Record<string, unknown>
-    const recordings = data.recordings as Array<{
-      media_shortcuts?: {
-        video_mixed?: {
-          data?: { download_url?: string }
-        }
-      }
-    }> | undefined
-    const first = Array.isArray(recordings) ? recordings[0] : undefined
-    const urlStr = first?.media_shortcuts?.video_mixed?.data?.download_url
-    return typeof urlStr === "string" && urlStr.length > 0 ? urlStr : null
+    const recordings = data.recordings as RecallBotRecordings | undefined
+    return Array.isArray(recordings) ? recordings : null
   } catch (err) {
-    console.warn("[recall] fetch bot recording error:", err)
+    console.warn("[recall] fetch bot error:", err)
+    return null
+  }
+}
+
+/**
+ * Fetch the recording video URL for a completed bot from Recall API.
+ * Call after bot.done, recording.done, or video.mixed.done. URL is pre-signed and expires (e.g. 5 hours).
+ */
+export async function fetchRecallBotRecordingUrl(botId: string): Promise<string | null> {
+  const recordings = await fetchRecallBotRecordings(botId)
+  const first = recordings?.[0]
+  const urlStr = first?.media_shortcuts?.video_mixed?.data?.download_url
+  return typeof urlStr === "string" && urlStr.length > 0 ? urlStr : null
+}
+
+type RecallDownloadUtterance = { participant?: { name?: string | null }; words?: Array<{ text?: string }> }
+
+/**
+ * Fetch full transcript for a bot (after transcript.done). Downloads from Recall's transcript URL.
+ */
+export async function fetchRecallBotTranscript(
+  botId: string
+): Promise<import("@/types").RecallTranscriptEntry[] | null> {
+  const recordings = await fetchRecallBotRecordings(botId)
+  const first = recordings?.[0]
+  const downloadUrl = first?.media_shortcuts?.transcript?.data?.download_url
+  if (typeof downloadUrl !== "string" || !downloadUrl) return null
+  try {
+    const res = await fetch(downloadUrl)
+    if (!res.ok) return null
+    const raw = (await res.json()) as unknown
+    const list = Array.isArray(raw) ? raw : null
+    if (!list) return null
+    const entries: import("@/types").RecallTranscriptEntry[] = []
+    for (const item of list as RecallDownloadUtterance[]) {
+      const words = item.words ?? []
+      const text = words.map((w) => (typeof w?.text === "string" ? w.text : "")).filter(Boolean).join(" ").trim()
+      if (!text) continue
+      entries.push({
+        speaker: typeof item.participant?.name === "string" ? item.participant.name : undefined,
+        text,
+      })
+    }
+    return entries.length > 0 ? entries : null
+  } catch (err) {
+    console.warn("[recall] fetch transcript download error:", err)
     return null
   }
 }

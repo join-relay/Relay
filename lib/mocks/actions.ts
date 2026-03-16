@@ -200,7 +200,26 @@ export function getActionStatus(id: string): ActionStoreEntry | undefined {
 export function rememberActionBases(actions: StoredPendingAction[]) {
   const store = getActionBaseStore()
   for (const action of actions) {
-    store.set(action.id, action)
+    const existing = store.get(action.id)
+    let toStore = action
+    if (action.type === "draft_email" && existing?.type === "draft_email") {
+      const incomingPayload = action.proposedAction as PendingAction["proposedAction"] & { body?: string }
+      const existingPayload = existing.proposedAction as PendingAction["proposedAction"] & { body?: string }
+      if (
+        typeof existingPayload?.body === "string" &&
+        existingPayload.body.trim() &&
+        (!incomingPayload?.body || !String(incomingPayload.body).trim())
+      ) {
+        toStore = {
+          ...action,
+          proposedAction: {
+            ...incomingPayload,
+            body: existingPayload.body,
+          },
+        } as StoredPendingAction
+      }
+    }
+    store.set(action.id, toStore)
   }
 }
 

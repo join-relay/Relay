@@ -1,7 +1,7 @@
 "use client"
 
+import { useRef } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, Calendar, Radio } from "lucide-react"
 import { JoinValidationPanel } from "@/components/meeting/JoinValidationPanel"
 import { MeetingPageHeader } from "@/components/meeting/MeetingPageHeader"
 import type {
@@ -12,6 +12,9 @@ import type {
 } from "@/types"
 
 const STATUS_FETCH_TIMEOUT_MS = 8000
+/** When run is completed but transcript/recording not yet in, poll this often (ms) for up to COMPLETED_POLL_CAP_MS. */
+const COMPLETED_WAITING_REFETCH_MS = 2000
+const COMPLETED_POLL_CAP_MS = 90000
 
 function formatEventTime(start: string, end: string): string {
   try {
@@ -227,6 +230,7 @@ async function createRecallBot(meetingUrl: string) {
 
 export default function MeetingPage() {
   const queryClient = useQueryClient()
+  const completedWaitingSince = useRef<number | null>(null)
   const {
     data: status,
     isLoading,
@@ -237,7 +241,26 @@ export default function MeetingPage() {
       const data = query.state.data as MeetingReadinessStatus | undefined
       const run = data?.activeRecallRun
       const active = run?.status === "joining" || run?.status === "running"
-      return active ? 3000 : 5000
+      if (active) return 3000
+      if (run?.status === "completed") {
+        const hasArtifacts = Boolean(
+          run.summary ||
+            (run.transcriptEntries?.length ?? 0) > 0 ||
+            run.artifactMetadata?.recordingUrl
+        )
+        if (!hasArtifacts) {
+          const now = Date.now()
+          if (completedWaitingSince.current === null) completedWaitingSince.current = now
+          if (now - (completedWaitingSince.current ?? 0) < COMPLETED_POLL_CAP_MS) {
+            return COMPLETED_WAITING_REFETCH_MS
+          }
+        } else {
+          completedWaitingSince.current = null
+        }
+      } else {
+        completedWaitingSince.current = null
+      }
+      return 5000
     },
     retry: 0,
   })
@@ -309,18 +332,12 @@ export default function MeetingPage() {
           {status.providerReadiness && status.providerReadiness.configState === "configured" && (
             <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
               <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-                Join a meeting with a bot
+                Join with a bot
               </h2>
               <p className="mt-1 text-sm text-[#3F5363]">
-                Paste a Google Meet URL and create a Recall bot. It will join and transcribe; status updates when the provider confirms.
+                Paste a Google Meet URL to create a Recall bot; it will join and transcribe.
               </p>
               <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
-                  <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Create bot
-                  </p>
-                  <p className="mt-1 text-sm text-[#3F5363]">
-                    Enter a Google Meet link below and click Create bot.
-                  </p>
                   <form
                     className="mt-3 flex gap-2"
                     onSubmit={(e) => {
@@ -381,9 +398,9 @@ export default function MeetingPage() {
                       Live transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s) so far.
                     </p>
                   )}
-                  {status.activeRecallRun.status === "completed" && !status.activeRecallRun.artifactMetadata?.recordingUrl && !status.activeRecallRun.summary && (
+                  {status.activeRecallRun.status === "completed" && status.transcriptSurface.previewLines.length === 0 && !status.summarySurface.summary && (
                     <p className="text-xs text-[#61707D]">
-                      If recording or summary don’t appear soon, ensure Recall’s webhook URL points to this app and RECALL_WEBHOOK_SECRET is set.
+                      To get transcript and summary here, in Recall add webhook <code className="rounded bg-[#e8edf3] px-1">/api/webhooks/recall</code> and subscribe to <strong>transcript</strong> and <strong>bot</strong>; set the same secret in Recall and as RECALL_WEBHOOK_SECRET.
                     </p>
                   )}
                 </div>
@@ -427,77 +444,25 @@ export default function MeetingPage() {
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Upcoming Google Meet
             </h2>
-            <div className="mt-3 space-y-3 text-sm text-[#3F5363]">
-              <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
-                <div className="flex items-center gap-2 text-[#1B2E3B]">
-                  <Calendar className="h-4 w-4" />
-                  Calendar discovery
-                </div>
-                <p className="mt-1">
-                  {upcomingStatus?.upcomingMeeting
-                    ? `${upcomingStatus.upcomingMeeting.title} at ${new Date(
-                        upcomingStatus.upcomingMeeting.start
-                      ).toLocaleTimeString("en-US", {
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}`
-                    : "No live Google Meet detected yet."}
-                </p>
-              </div>
-
-              <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
-                <div className="flex items-center gap-2 text-[#1B2E3B]">
-                  <Radio className="h-4 w-4" />
-                  Readiness note
-                </div>
-                <p className="mt-1">
-                  {status.nextMeeting?.joinUrl
-                    ? "A Google Meet join URL is present on the upcoming event."
-                    : "No confirmed Meet join URL is present from the current readiness data."}
-                </p>
-              </div>
-
-              <div className="rounded-relay-inner border border-[#3F5363]/25 bg-[#e8edf3]/70 p-3">
-                <div className="flex items-start gap-2 text-sm text-[#314555]">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                  <p>
-                    {upcomingStatus?.detail ??
-                      "Upcoming Google Meet discovery stays explicit about whether it is live or fallback."}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              Runtime evidence
-            </h2>
             <p className="mt-2 text-sm text-[#3F5363]">
-              {status.runtimeEvidenceNote}
+              {upcomingStatus?.upcomingMeeting
+                ? `${upcomingStatus.upcomingMeeting.title} at ${new Date(
+                    upcomingStatus.upcomingMeeting.start
+                  ).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`
+                : "No upcoming Meet from Calendar."}
             </p>
             {lastJoinAttempt && (
-              <div className="mt-3 space-y-3 text-sm text-[#3F5363]">
-                {lastJoinAttempt && (
-                  <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3">
-                    <p className="font-medium text-[#1B2E3B]">
-                      Link check: {lastJoinAttempt.state.replaceAll("_", " ")}
-                    </p>
-                    <p className="mt-1">{lastJoinAttempt.detail}</p>
-                  </div>
-                )}
-              </div>
+              <p className="mt-2 text-xs text-[#61707D]">
+                Link check: {lastJoinAttempt.state.replaceAll("_", " ")} — {lastJoinAttempt.detail}
+              </p>
             )}
           </div>
 
           {status.activeRecallRun?.artifactMetadata?.recordingUrl && (
             <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
               <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-                Meeting recording
+                Recording
               </h2>
-              <p className="mt-1 text-xs text-[#61707D]">
-                Recording is available after the bot leaves the call. Link expires in about 5 hours.
-              </p>
               <div className="mt-3 rounded-relay-inner overflow-hidden border border-[var(--border)] bg-black/5">
                 <video
                   src={status.activeRecallRun.artifactMetadata.recordingUrl}
@@ -516,8 +481,7 @@ export default function MeetingPage() {
               Meeting summary
             </h2>
             <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363] whitespace-pre-wrap">
-              {status.summarySurface.summary ??
-                "No meeting summary is available yet. This panel is ready for future Google Meet summary artifacts or manual fallback summaries."}
+              {status.summarySurface.summary ?? "No summary yet. It appears after the bot leaves and transcript is received."}
             </div>
           </div>
 
@@ -529,28 +493,23 @@ export default function MeetingPage() {
             />
           )}
 
-          <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
-            <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              Action items
-            </h2>
-            <div className="mt-3 space-y-2">
-              {status.actionItemsSurface.items.length > 0 ? (
-                status.actionItemsSurface.items.map((item) => (
+          {status.actionItemsSurface.items.length > 0 && (
+            <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+              <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+                Action items
+              </h2>
+              <div className="mt-3 space-y-2">
+                {status.actionItemsSurface.items.map((item) => (
                   <div
                     key={item}
                     className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm text-[#314555]"
                   >
                     {item}
                   </div>
-                ))
-              ) : (
-                <div className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
-                  No meeting action items are captured yet. Relay will only show them when a real
-                  summary path or artifact exists.
-                </div>
-              )}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">

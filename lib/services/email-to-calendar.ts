@@ -25,6 +25,11 @@ export async function extractProposedMeetingFromEmail(
   const apiKey = getApiKey()
   if (!apiKey) return null
 
+  const userTimezone =
+    process.env.USER_TIMEZONE?.trim() ||
+    process.env.CALENDAR_DEFAULT_TIMEZONE?.trim() ||
+    "America/Edmonton"
+
   try {
     const res = await fetch(OPENAI_CHAT_URL, {
       method: "POST",
@@ -38,9 +43,9 @@ export async function extractProposedMeetingFromEmail(
           {
             role: "system",
             content: `You extract a single proposed meeting or call from an email.
-CRITICAL: Use the EXACT time mentioned in the email. If the email says "8 PM" or "at 8" use 20:00 (8 PM), not 2 PM or 14:00. If it says "2 PM" use 14:00.
-Today's date (use for relative times like "tomorrow", "same time"): ${new Date().toISOString().slice(0, 10)}.
-Interpret all times (e.g. 8 PM, 3pm) as the same calendar day unless the email says another day. Output start and end in ISO 8601 with Z (UTC). If the sender said "8 PM" assume they mean 20:00 local; you may output that time in UTC by assuming a reasonable offset (e.g. US Eastern = -5) so 8 PM Eastern = 01:00 next day Z.
+CRITICAL: Interpret ALL times (e.g. "8 PM", "at 8", "3pm") in the user's timezone: ${userTimezone}. "8 PM" means 20:00 in that timezone, then convert to UTC for start/end. Do NOT use 14:00 for "8 PM" or 18:00 for "8 PM".
+Today's date (use for relative times like "tomorrow"): ${new Date().toISOString().slice(0, 10)}.
+Output start and end in ISO 8601 with Z (UTC). Example: 8 PM in ${userTimezone} = that time in local, then convert to UTC for start/end.
 Output a JSON object only, no markdown: { "title": string (short event title), "start": string (ISO UTC), "end": string (ISO UTC), "confidence": "high"|"medium"|"low", "rawPhrase": string (exact quote from email) }.
 If there is no clear proposed meeting time, output null. Default duration 1 hour if not specified.`,
           },
