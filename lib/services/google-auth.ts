@@ -281,6 +281,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
       encryptionReady: true,
       canReadGmail: true,
       canReadCalendar: true,
+      canWriteCalendar: true,
       canUseLiveBriefing: true,
       nextMeetEvent: null,
       note: "Dev test live-data mode is active for deterministic Gmail and Calendar coverage.",
@@ -293,6 +294,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
   const scopes = record?.scopes ?? []
   const canReadGmail = hasGrantedScope(scopes, GOOGLE_GMAIL_READ_SCOPE)
   const canReadCalendar = hasGrantedScope(scopes, GOOGLE_CALENDAR_READ_SCOPE)
+  const canWriteCalendar = hasGrantedScope(scopes, GOOGLE_CALENDAR_WRITE_SCOPE)
   const hasStaleCalendarReadScope = hasLegacyCalendarReadScope(scopes)
 
   if (!env.ready) {
@@ -307,6 +309,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
       encryptionReady,
       canReadGmail,
       canReadCalendar,
+      canWriteCalendar: false,
       canUseLiveBriefing: false,
       nextMeetEvent: null,
       note: "Relay still needs Google OAuth server configuration before live Gmail and Calendar reads can work.",
@@ -325,6 +328,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
       encryptionReady,
       canReadGmail: false,
       canReadCalendar: false,
+      canWriteCalendar: false,
       canUseLiveBriefing: false,
       nextMeetEvent: null,
       note: "Google auth is not connected, so Relay is using explicit mock fallback data.",
@@ -343,6 +347,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
       encryptionReady,
       canReadGmail,
       canReadCalendar,
+      canWriteCalendar: false,
       canUseLiveBriefing: false,
       nextMeetEvent: null,
       note: encryptionReady
@@ -362,6 +367,7 @@ export async function getBaseGoogleIntegrationStatus(params: {
     encryptionReady,
     canReadGmail,
     canReadCalendar,
+    canWriteCalendar,
     canUseLiveBriefing: canReadGmail && canReadCalendar,
     nextMeetEvent: null,
     note:

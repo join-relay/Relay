@@ -1,6 +1,6 @@
 import "server-only"
 
-import type { MeetingRunRecord, RecallTranscriptEntry } from "@/types"
+import type { MeetingRunRecord, ProposedCalendarEvent, RecallTranscriptEntry } from "@/types"
 import { getStore, setStore } from "./store-backend"
 
 function normalizeRun(raw: unknown): MeetingRunRecord | null {
@@ -37,6 +37,27 @@ function normalizeRun(raw: unknown): MeetingRunRecord | null {
     ? (r.artifactMetadata as MeetingRunRecord["artifactMetadata"])
     : undefined
 
+  const proposedCalendarEvents: ProposedCalendarEvent[] = Array.isArray(r.proposedCalendarEvents)
+    ? (r.proposedCalendarEvents as unknown[]).filter((e): e is ProposedCalendarEvent => {
+        if (!e || typeof e !== "object") return false
+        const x = e as Record<string, unknown>
+        return (
+          typeof x.id === "string" &&
+          typeof x.title === "string" &&
+          typeof x.start === "string" &&
+          typeof x.end === "string"
+        )
+      }).map((e) => ({
+        id: (e as ProposedCalendarEvent).id,
+        title: (e as ProposedCalendarEvent).title,
+        start: (e as ProposedCalendarEvent).start,
+        end: (e as ProposedCalendarEvent).end,
+        description: typeof (e as ProposedCalendarEvent).description === "string" ? (e as ProposedCalendarEvent).description : undefined,
+        confidence: (e as ProposedCalendarEvent).confidence,
+        rawPhrase: typeof (e as ProposedCalendarEvent).rawPhrase === "string" ? (e as ProposedCalendarEvent).rawPhrase : undefined,
+      }))
+    : []
+
   return {
     id: r.id,
     provider: "recall_ai",
@@ -50,6 +71,7 @@ function normalizeRun(raw: unknown): MeetingRunRecord | null {
     artifactMetadata,
     transcriptEntries,
     summary: typeof r.summary === "string" ? r.summary : r.summary === null ? null : undefined,
+    proposedCalendarEvents: proposedCalendarEvents.length > 0 ? proposedCalendarEvents : undefined,
   }
 }
 
@@ -104,7 +126,7 @@ export async function updateMeetingRunByBotId(
   patch: Partial<
     Pick<
       MeetingRunRecord,
-      "status" | "providerStatus" | "providerError" | "updatedAt" | "summary"
+      "status" | "providerStatus" | "providerError" | "updatedAt" | "summary" | "proposedCalendarEvents"
     > & {
       artifactMetadata?: Partial<MeetingRunRecord["artifactMetadata"]>
     }

@@ -5,7 +5,23 @@ import { ChevronDown, ChevronUp, Mail, Calendar, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { DraftReview } from "./DraftReview"
 import { ApprovalControls } from "./ApprovalControls"
-import type { PendingAction, DraftEmailPayload, RescheduleMeetingPayload } from "@/types"
+import type {
+  PendingAction,
+  DraftEmailPayload,
+  RescheduleMeetingPayload,
+  ProposedCalendarEvent,
+} from "@/types"
+
+function formatEventTime(start: string, end: string): string {
+  try {
+    const s = new Date(start)
+    const e = new Date(end)
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return `${start} – ${end}`
+    return `${s.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })} – ${e.toLocaleTimeString(undefined, { timeStyle: "short" })}`
+  } catch {
+    return `${start} – ${end}`
+  }
+}
 
 interface ActionCardProps {
   action: PendingAction
@@ -14,6 +30,8 @@ interface ActionCardProps {
   onEditContent: (id: string, content: DraftEmailPayload | RescheduleMeetingPayload) => void
   onGenerateDraft?: (id: string) => void
   onRegenerateDraft?: (id: string) => void
+  onAddEmailCalendarEvent?: (actionId: string, event: ProposedCalendarEvent) => Promise<void>
+  onDismissEmailCalendarEvent?: (actionId: string) => void
   isApproving?: boolean
   isRejecting?: boolean
   isGeneratingDraft?: boolean
@@ -40,6 +58,8 @@ export function ActionCard({
   onEditContent,
   onGenerateDraft,
   onRegenerateDraft,
+  onAddEmailCalendarEvent,
+  onDismissEmailCalendarEvent,
   isApproving = false,
   isRejecting = false,
   isGeneratingDraft = false,
@@ -50,6 +70,20 @@ export function ActionCard({
   const [expanded, setExpanded] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [showFullOriginal, setShowFullOriginal] = useState(false)
+  const [emailCalendarDismissed, setEmailCalendarDismissed] = useState(false)
+  const [emailCalendarAdded, setEmailCalendarAdded] = useState(false)
+  const [isEditingCalendarEvent, setIsEditingCalendarEvent] = useState(false)
+  const [editedCalendarEvent, setEditedCalendarEvent] = useState<ProposedCalendarEvent | null>(null)
+  const [addCalendarError, setAddCalendarError] = useState<string | null>(null)
+  const [isAddingToCalendar, setIsAddingToCalendar] = useState(false)
+  const showEmailCalendarPreview =
+    action.type === "draft_email" &&
+    action.proposedCalendarEvent &&
+    !emailCalendarDismissed &&
+    !emailCalendarAdded
+  const displayEvent = isEditingCalendarEvent && editedCalendarEvent
+    ? editedCalendarEvent
+    : action.proposedCalendarEvent ?? null
 
   const handleApprove = () => onApprove(action.id)
   const handleReject = () => onReject(action.id)
@@ -139,6 +173,167 @@ export function ActionCard({
               Why this surfaced: {action.whySurfaced}
             </button>
           </div>
+
+          {showEmailCalendarPreview && displayEvent && (
+            <div className="rounded-relay-inner border border-[var(--border)] bg-white/80 p-4">
+              <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
+                Suggested meeting from this email
+              </p>
+              {!isEditingCalendarEvent ? (
+                <>
+                  <p className="mt-1 font-medium text-[#1B2E3B]">{displayEvent.title}</p>
+                  <p className="mt-0.5 text-sm text-[#3F5363]">
+                    {formatEventTime(displayEvent.start, displayEvent.end)}
+                  </p>
+                  {displayEvent.rawPhrase && (
+                    <p className="mt-1 text-xs text-[#61707D] italic">&ldquo;{displayEvent.rawPhrase}&rdquo;</p>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!onAddEmailCalendarEvent) return
+                        setAddCalendarError(null)
+                        setIsAddingToCalendar(true)
+                        try {
+                          await onAddEmailCalendarEvent(action.id, displayEvent)
+                          setEmailCalendarAdded(true)
+                        } catch (e) {
+                          setAddCalendarError(e instanceof Error ? e.message : "Failed to add to calendar")
+                        } finally {
+                          setIsAddingToCalendar(false)
+                        }
+                      }}
+                      disabled={isAddingToCalendar}
+                      className="rounded-relay-control bg-[#213443] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1B2E3B] disabled:opacity-60"
+                    >
+                      {isAddingToCalendar ? "Adding…" : "Add to calendar"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingCalendarEvent(true)
+                        setEditedCalendarEvent({
+                          ...displayEvent,
+                          title: displayEvent.title,
+                          start: displayEvent.start,
+                          end: displayEvent.end,
+                        })
+                      }}
+                      className="rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#3F5363] hover:bg-[#e8edf3]"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailCalendarDismissed(true)
+                        onDismissEmailCalendarEvent?.(action.id)
+                      }}
+                      className="rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#3F5363] hover:bg-[#e8edf3]"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                  {addCalendarError && (
+                    <p className="mt-2 text-xs text-[#7c3a2d]">{addCalendarError}</p>
+                  )}
+                </>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  <label className="block text-xs font-medium text-[#3F5363]">
+                    Title
+                    <input
+                      type="text"
+                      value={editedCalendarEvent?.title ?? ""}
+                      onChange={(e) =>
+                        setEditedCalendarEvent((prev) =>
+                          prev ? { ...prev, title: e.target.value } : null
+                        )
+                      }
+                      className="mt-1 block w-full rounded border border-[var(--border)] bg-white px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-xs font-medium text-[#3F5363]">
+                      Start
+                      <input
+                        type="datetime-local"
+                        value={
+                          editedCalendarEvent?.start
+                            ? new Date(editedCalendarEvent.start).toISOString().slice(0, 16)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (!v || !editedCalendarEvent) return
+                          setEditedCalendarEvent((prev) =>
+                            prev ? { ...prev, start: new Date(v).toISOString() } : null
+                          )
+                        }}
+                        className="mt-1 block w-full rounded border border-[var(--border)] bg-white px-2 py-1.5 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs font-medium text-[#3F5363]">
+                      End
+                      <input
+                        type="datetime-local"
+                        value={
+                          editedCalendarEvent?.end
+                            ? new Date(editedCalendarEvent.end).toISOString().slice(0, 16)
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value
+                          if (!v || !editedCalendarEvent) return
+                          setEditedCalendarEvent((prev) =>
+                            prev ? { ...prev, end: new Date(v).toISOString() } : null
+                          )
+                        }}
+                        className="mt-1 block w-full rounded border border-[var(--border)] bg-white px-2 py-1.5 text-sm"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!editedCalendarEvent || !onAddEmailCalendarEvent) return
+                        setAddCalendarError(null)
+                        setIsAddingToCalendar(true)
+                        try {
+                          await onAddEmailCalendarEvent(action.id, editedCalendarEvent)
+                          setEmailCalendarAdded(true)
+                          setIsEditingCalendarEvent(false)
+                        } catch (e) {
+                          setAddCalendarError(e instanceof Error ? e.message : "Failed to add")
+                        } finally {
+                          setIsAddingToCalendar(false)
+                        }
+                      }}
+                      disabled={isAddingToCalendar}
+                      className="rounded-relay-control bg-[#213443] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#1B2E3B] disabled:opacity-60"
+                    >
+                      Save & add to calendar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditingCalendarEvent(false)
+                        setEditedCalendarEvent(null)
+                      }}
+                      className="rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#3F5363] hover:bg-[#e8edf3]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {addCalendarError && (
+                    <p className="mt-2 text-xs text-[#7c3a2d]">{addCalendarError}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <span

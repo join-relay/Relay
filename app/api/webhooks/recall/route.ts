@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyRecallWebhook } from "@/lib/recall/verify-webhook"
 import { fetchRecallBotRecordingUrl } from "@/lib/services/recall"
 import { generateMeetingSummary } from "@/lib/services/meeting-summary"
+import { extractProposedMeetings } from "@/lib/services/meeting-to-calendar"
 import {
   appendTranscriptToRun,
   getMeetingRunByBotId,
@@ -107,12 +108,22 @@ export async function POST(request: NextRequest) {
       const run = await getMeetingRunByBotId(botId)
       const entries = (run?.transcriptEntries ?? []) as RecallTranscriptEntry[]
       const summary = entries.length > 0 ? await generateMeetingSummary(entries) : null
+      const refStart = run?.createdAt ?? new Date().toISOString()
+      const refEnd = new Date(new Date(refStart).getTime() + 60 * 60 * 1000).toISOString()
+      const proposedCalendarEvents =
+        entries.length > 0
+          ? await extractProposedMeetings(entries, summary, {
+              referenceStart: refStart,
+              referenceEnd: refEnd,
+            })
+          : []
       await updateMeetingRunByBotId(botId, {
         artifactMetadata: {
           recordingUrl: recordingUrl ?? undefined,
           recordingSource: recordingUrl ? "recall_recording" : undefined,
         },
         summary: summary ?? null,
+        proposedCalendarEvents: proposedCalendarEvents.length > 0 ? proposedCalendarEvents : undefined,
       })
     }
 

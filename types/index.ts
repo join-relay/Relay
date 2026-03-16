@@ -272,6 +272,8 @@ export interface PendingAction {
   executedAt?: string
   executionSummary?: string
   createdAt: string
+  /** Suggested meeting extracted from email (e.g. "let's meet Tuesday 3pm"). */
+  proposedCalendarEvent?: ProposedCalendarEvent | null
 }
 
 export interface ActionsViewState {
@@ -372,6 +374,8 @@ export interface GoogleIntegrationStatus {
   encryptionReady: boolean
   canReadGmail: boolean
   canReadCalendar: boolean
+  /** True when calendar.events scope is granted (create/patch events from meetings). */
+  canWriteCalendar?: boolean
   canUseLiveBriefing: boolean
   nextMeetEvent?: CalendarEvent | null
   note: string
@@ -444,6 +448,18 @@ export interface MeetingRunRecord {
   transcriptEntries?: RecallTranscriptEntry[]
   /** Post-meeting summary generated when the bot completes (from transcript). */
   summary?: string | null
+  /** Follow-up meetings extracted from transcript (e.g. "same time next week"). */
+  proposedCalendarEvents?: ProposedCalendarEvent[]
+}
+
+export interface ProposedCalendarEvent {
+  id: string
+  title: string
+  start: string
+  end: string
+  description?: string
+  confidence?: "high" | "medium" | "low"
+  rawPhrase?: string
 }
 
 /**

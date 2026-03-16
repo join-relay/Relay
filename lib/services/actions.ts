@@ -7,6 +7,7 @@ import {
   isGoogleMeetEvent,
   patchCalendarEvent,
 } from "@/lib/services/calendar"
+import { extractProposedMeetingFromEmail } from "@/lib/services/email-to-calendar"
 import {
   getGmailThreadContext,
   getLiveGmailThreadById,
@@ -670,23 +671,24 @@ function buildSignOff(
   preferredSignatureBlock?: string
 ) {
   const lines: string[] = []
+  const hasExplicitOverride = Boolean(settings.emailSignatureOverride?.trim())
   const explicitSignOffExample = styleProfile.styleAnchors.signOffExamples[0]?.trim()
   const signatureLines = preferredSignatureBlock
     ?.split("\n")
     .map((line) => line.trimEnd())
     .filter(Boolean) ?? []
   const signatureStartsWithSignOff = signatureLines.length > 0 && isSignOffLine(signatureLines[0])
-
   const signOffFromSignature =
     signatureLines.length > 0 && isSignOffLine(signatureLines[0]) ? signatureLines[0] : null
+
   if (settings.includeSignOff && !signatureStartsWithSignOff) {
     const signOff =
       signOffFromSignature ||
-      explicitSignOffExample ||
-      styleProfile.styleAnchors.closingLineExamples?.[0]?.trim()
+      (hasExplicitOverride ? null : explicitSignOffExample) ||
+      (hasExplicitOverride ? null : styleProfile.styleAnchors.closingLineExamples?.[0]?.trim())
     if (signOff) {
       lines.push(signOff)
-    } else {
+    } else if (!hasExplicitOverride) {
       switch (styleProfile.signOffStyle) {
         case "best_regards":
           lines.push("Best regards,")
@@ -725,7 +727,7 @@ function buildSignOff(
     } else {
       lines.push(preferredSignatureBlock)
     }
-  } else if (settings.includeSignOff && styleProfile.signOffStyle === "name_only") {
+  } else if (settings.includeSignOff && styleProfile.signOffStyle === "name_only" && !hasExplicitOverride) {
     lines.push(displayName)
   }
 
@@ -1569,6 +1571,10 @@ async function generateDraftForActionWithIdentity(params: {
       fallbackTriggered: reusableCachedDraft.generation.source !== "openai",
       fallbackReason: reusableCachedDraft.generation.fallbackReason,
     })
+    const proposedCalendarEvent = await extractProposedMeetingFromEmail(
+      activeThreadText,
+      thread.subject
+    )
     const updatedBase: PendingActionBase = {
       ...base,
       provenance: {
@@ -1624,6 +1630,7 @@ async function generateDraftForActionWithIdentity(params: {
       createdAt: thread.date,
       sourceContext: `${thread.subject} - from ${thread.from}`,
       title: `Draft reply to ${thread.subject}`,
+      proposedCalendarEvent: proposedCalendarEvent ?? undefined,
     }
 
     rememberActionBases([updatedBase])
@@ -1644,28 +1651,31 @@ async function generateDraftForActionWithIdentity(params: {
     settings,
     styleProfile,
   })
-  const generatedDraft = await generateDraftEmailBody({
-    displayName,
-    userEmail,
-    recipientName: replyIdentity.recipientName,
-    recipientEmail: replyIdentity.recipientEmail,
-    thread,
-    threadContext: normalizedThreadContext,
-    styleProfile,
-    settings,
-    debug: debugEnabled
-      ? {
-          onRequest: (payload) =>
-            logDraftDebug(id, "openai_request", {
-              payload,
-            }),
-          onResponse: (payload) =>
-            logDraftDebug(id, "openai_response", {
-              payload,
-            }),
-        }
-      : undefined,
-  })
+  const [generatedDraft, proposedCalendarEvent] = await Promise.all([
+    generateDraftEmailBody({
+      displayName,
+      userEmail,
+      recipientName: replyIdentity.recipientName,
+      recipientEmail: replyIdentity.recipientEmail,
+      thread,
+      threadContext: normalizedThreadContext,
+      styleProfile,
+      settings,
+      debug: debugEnabled
+        ? {
+            onRequest: (payload) =>
+              logDraftDebug(id, "openai_request", {
+                payload,
+              }),
+            onResponse: (payload) =>
+              logDraftDebug(id, "openai_response", {
+                payload,
+              }),
+          }
+        : undefined,
+    }),
+    extractProposedMeetingFromEmail(activeThreadText, thread.subject),
+  ])
   const generatedCore = generatedDraft?.body ? stripGeneratedReplyFraming(generatedDraft.body) : ""
   const fallbackReason =
     openAIConfigured
@@ -1796,6 +1806,7 @@ async function generateDraftForActionWithIdentity(params: {
     createdAt: thread.date,
     sourceContext: `${thread.subject} - from ${thread.from}`,
     title: `Draft reply to ${thread.subject}`,
+    proposedCalendarEvent: proposedCalendarEvent ?? undefined,
   }
 
   rememberActionBases([updatedBase])

@@ -221,3 +221,45 @@ export async function patchCalendarEvent(
 
   return { id: res.data.id ?? apiEventId }
 }
+
+export type CreateCalendarEventPayload = {
+  title: string
+  start: string
+  end: string
+  description?: string
+  location?: string
+  calendarId?: string
+}
+
+/**
+ * Create a calendar event. Requires calendar.events (write) scope.
+ */
+export async function createCalendarEvent(
+  email: string | null | undefined,
+  payload: CreateCalendarEventPayload
+): Promise<{ id: string; calendarId: string }> {
+  const accessToken = await getGoogleAccessToken(email)
+  if (!accessToken) {
+    throw new Error("No Google access token is available for Calendar create")
+  }
+
+  const calendarId = payload.calendarId ?? "primary"
+  const calendar = google.calendar({
+    version: "v3",
+    auth: getGoogleOAuthClient(accessToken),
+  })
+
+  const res = await calendar.events.insert({
+    calendarId,
+    requestBody: {
+      summary: payload.title,
+      description: payload.description ?? undefined,
+      location: payload.location ?? undefined,
+      start: { dateTime: payload.start, timeZone: "UTC" },
+      end: { dateTime: payload.end, timeZone: "UTC" },
+    },
+  })
+
+  const id = res.data.id ?? ""
+  return { id, calendarId }
+}

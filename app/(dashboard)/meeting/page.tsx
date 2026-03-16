@@ -8,9 +8,123 @@ import type {
   MeetingLinkCheckAttempt,
   MeetingReadinessStatus,
   MeetingUpcomingStatus,
+  ProposedCalendarEvent,
 } from "@/types"
 
 const STATUS_FETCH_TIMEOUT_MS = 8000
+
+function formatEventTime(start: string, end: string): string {
+  try {
+    const s = new Date(start)
+    const e = new Date(end)
+    if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return `${start} – ${end}`
+    return `${s.toLocaleString(undefined, { dateStyle: "short", timeStyle: "short" })} – ${e.toLocaleTimeString(undefined, { timeStyle: "short" })}`
+  } catch {
+    return `${start} – ${end}`
+  }
+}
+
+function SuggestedEventsCard({
+  proposedEvents,
+  runBotId,
+  onUpdate,
+}: {
+  proposedEvents: ProposedCalendarEvent[]
+  runBotId: string
+  onUpdate: () => void
+}) {
+  const queryClient = useQueryClient()
+  const addMutation = useMutation({
+    mutationFn: async (event: ProposedCalendarEvent) => {
+      const res = await fetch("/api/calendar/events", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: event.title,
+          start: event.start,
+          end: event.end,
+          description: event.description,
+          runBotId,
+          proposedEventId: event.id,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error((data as { error?: string }).error ?? "Failed to add to calendar")
+      }
+      return res.json()
+    },
+    onSuccess: () => {
+      onUpdate()
+      queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })
+    },
+  })
+  const dismissMutation = useMutation({
+    mutationFn: async (proposedEventId: string) => {
+      const res = await fetch("/api/calendar/events", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ runBotId, proposedEventId }),
+      })
+      if (!res.ok) throw new Error("Failed to dismiss")
+      return res.json()
+    },
+    onSuccess: () => {
+      onUpdate()
+      queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })
+    },
+  })
+
+  return (
+    <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
+      <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
+        Suggested events from this meeting
+      </h2>
+      <p className="mt-1 text-xs text-[#61707D]">
+        Add to your Google Calendar or dismiss.
+      </p>
+      <div className="mt-3 space-y-3">
+        {proposedEvents.map((event) => (
+          <div
+            key={event.id}
+            className="rounded-relay-inner border border-[var(--border)] bg-white/60 p-3 text-sm"
+          >
+            <p className="font-medium text-[#1B2E3B]">{event.title}</p>
+            <p className="mt-1 text-xs text-[#3F5363]">
+              {formatEventTime(event.start, event.end)}
+            </p>
+            {event.rawPhrase && (
+              <p className="mt-1 text-xs text-[#61707D] italic">&ldquo;{event.rawPhrase}&rdquo;</p>
+            )}
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => addMutation.mutate(event)}
+                disabled={addMutation.isPending}
+                className="rounded-relay-control bg-[#213443] px-3 py-1.5 text-xs font-medium text-white shadow-relay-soft hover:bg-[#1B2E3B] disabled:opacity-60"
+              >
+                {addMutation.isPending ? "Adding…" : "Add to calendar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => dismissMutation.mutate(event.id)}
+                disabled={dismissMutation.isPending}
+                className="rounded-relay-control border border-[var(--border)] bg-white px-3 py-1.5 text-xs font-medium text-[#3F5363] hover:bg-[#e8edf3] disabled:opacity-60"
+              >
+                Dismiss
+              </button>
+            </div>
+            {addMutation.isError && addMutation.variables?.id === event.id && (
+              <p className="mt-2 text-xs text-[#7c3a2d]">
+                {addMutation.error instanceof Error ? addMutation.error.message : "Failed to add"}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 function buildClientErrorMeetingStatus(message: string): MeetingReadinessStatus {
   return {
@@ -119,7 +233,12 @@ export default function MeetingPage() {
   } = useQuery({
     queryKey: ["meeting-readiness"],
     queryFn: fetchMeetingReadinessStatus,
-    refetchInterval: 5000,
+    refetchInterval: (query) => {
+      const data = query.state.data as MeetingReadinessStatus | undefined
+      const run = data?.activeRecallRun
+      const active = run?.status === "joining" || run?.status === "running"
+      return active ? 3000 : 5000
+    },
     retry: 0,
   })
   const { data: upcomingStatus } = useQuery({
@@ -241,17 +360,30 @@ export default function MeetingPage() {
                 </div>
 
               {status.activeRecallRun && (
-                <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4">
+                <div className="mt-4 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 space-y-3">
                   <p className="text-[11px] font-medium uppercase tracking-wider text-[#61707D]">
-                    Current run
+                    What’s happening with your bot
                   </p>
-                  <p className="mt-1 text-sm text-[#1B2E3B]">
+                  <p className="text-sm font-medium text-[#1B2E3B]">
+                    {status.activeRecallRun.status === "joining" && "Joining the call…"}
+                    {status.activeRecallRun.status === "running" && "In the call — recording and transcribing."}
+                    {status.activeRecallRun.status === "completed" && "Meeting ended. Summary and recording appear below when ready."}
+                    {status.activeRecallRun.status === "failed" && "Bot could not stay in the call."}
+                    {!["joining", "running", "completed", "failed"].includes(status.activeRecallRun.status) &&
+                      (status.activeRecallRun.providerStatus ?? status.activeRecallRun.status)}
+                  </p>
+                  <p className="text-xs text-[#61707D]">
                     {status.activeRecallRun.botId && `Bot ID: ${status.activeRecallRun.botId} · `}
-                    Status: {status.activeRecallRun.providerStatus ?? status.activeRecallRun.status}
+                    Provider: {String(status.activeRecallRun.providerStatus ?? status.activeRecallRun.status)}
                   </p>
                   {status.activeRecallRun.artifactMetadata && status.activeRecallRun.artifactMetadata.transcriptEntries > 0 && (
-                    <p className="mt-1 text-sm text-[#3F5363]">
-                      Transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s)
+                    <p className="text-sm text-[#3F5363]">
+                      Live transcript: {status.activeRecallRun.artifactMetadata.transcriptEntries} utterance(s) so far.
+                    </p>
+                  )}
+                  {status.activeRecallRun.status === "completed" && !status.activeRecallRun.artifactMetadata?.recordingUrl && !status.activeRecallRun.summary && (
+                    <p className="text-xs text-[#61707D]">
+                      If recording or summary don’t appear soon, ensure Recall’s webhook URL points to this app and RECALL_WEBHOOK_SECRET is set.
                     </p>
                   )}
                 </div>
@@ -286,6 +418,11 @@ export default function MeetingPage() {
         </div>
 
         <div className="space-y-4">
+          {status.activeRecallRun && (status.activeRecallRun.status === "joining" || status.activeRecallRun.status === "running") && (
+            <p className="text-xs text-[#61707D]">
+              Status and transcript below update every few seconds while the bot is in the call.
+            </p>
+          )}
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Upcoming Google Meet
@@ -384,6 +521,14 @@ export default function MeetingPage() {
             </div>
           </div>
 
+          {status.activeRecallRun?.proposedCalendarEvents && status.activeRecallRun.proposedCalendarEvents.length > 0 && (
+            <SuggestedEventsCard
+              proposedEvents={status.activeRecallRun.proposedCalendarEvents}
+              runBotId={status.activeRecallRun.botId ?? ""}
+              onUpdate={() => queryClient.invalidateQueries({ queryKey: ["meeting-readiness"] })}
+            />
+          )}
+
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
               Action items
@@ -409,13 +554,15 @@ export default function MeetingPage() {
 
           <div className="rounded-relay-card border border-[var(--border)] bg-white/80 p-5 shadow-relay-soft">
             <h2 className="text-sm font-semibold tracking-tight text-[#1B2E3B]">
-              Transcript preview
+              {status.activeRecallRun?.status === "joining" || status.activeRecallRun?.status === "running"
+                ? "Live transcript"
+                : "Transcript"}
             </h2>
-            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363]">
+            <div className="mt-3 rounded-relay-inner border border-[var(--border)] bg-white/60 p-4 text-sm text-[#3F5363] max-h-[320px] overflow-y-auto">
               {status.transcriptSurface.previewLines.length > 0 ? (
                 <div className="space-y-2">
-                  {status.transcriptSurface.previewLines.map((line) => (
-                    <p key={line}>{line}</p>
+                  {status.transcriptSurface.previewLines.map((line, i) => (
+                    <p key={`${i}-${line.slice(0, 40)}`}>{line}</p>
                   ))}
                 </div>
               ) : (
